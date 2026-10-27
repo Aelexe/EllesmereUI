@@ -16,6 +16,7 @@ EllesmereUIQuestTracker.lua
 EllesmereUIQuestTracker_Skin.lua
 EllesmereUIQuestTracker_Visibility.lua
 EllesmereUIQuestTracker_QoL.lua
+EllesmereUIQuestTracker_Position.lua
 EllesmereUIQuestTracker_Forever.lua
 EllesmereUIQuestTracker_QuestLinks.lua
 

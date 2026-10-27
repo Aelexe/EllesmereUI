@@ -178,6 +178,7 @@ local KEY_PREFIX_FOLDER = {
     ["ERB_"]   = "EllesmereUIResourceBars",
     ["ECHAT_"] = "EllesmereUIChat",
     ["EBS_"]   = "EllesmereUIMinimap",
+    ["EQT_"]   = "EllesmereUIQuestTracker",
     ["EDR_"]   = "EllesmereUIBlizzardSkin",
     ["EMT_"]   = "EllesmereUIMythicTimer",
     ["EABR_"]  = "EllesmereUIAuraBuffReminders",

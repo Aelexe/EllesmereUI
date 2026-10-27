@@ -1567,7 +1567,9 @@ local function HookFrameSizeChanged(key)
     -- No hooks on chat frames: ChatFrame1 is docked inside Blizzard's secure
     -- FCF_OpenTemporaryWindow chain and any addon code in OnSizeChanged/SetPoint
     -- hooks taints the execution context. Chat persists its own position/size.
-    if key and key:find("^ECHAT_") then return end
+    -- The quest tracker is laid out by Blizzard's managed frame container, in
+    -- combat too, and places itself from its Edit Mode layout entry.
+    if key and (key:find("^ECHAT_") or key == "EQT_Tracker") then return end
     local bar = UM.GetBarFrame(key)
     if not bar then return end
     if not _sizeHookedFrames[bar] then
