@@ -158,6 +158,8 @@ function EQT.SyncPosition()
     local pos = cfg.position
     EllesmereUI.ClearFramePoints(f)
     EllesmereUI.SetFramePoint(f, pos.point, UIParent, pos.relPoint or pos.point, pos.x, pos.y)
+    -- The login anchor pass may have run while the tracker was still held.
+    EllesmereUI.ReapplyUnlockAnchor("EQT_Tracker")
 end
 
 local function ApplyReset()
@@ -184,6 +186,11 @@ function EQT.InitPosition()
                 return f:GetWidth(), EQT.DB().height or f:GetHeight()
             end,
             isHidden = function() return not EQT.Cfg("enabled") end,
+            -- Until its Edit Mode layout applies, the managed container places it.
+            isPositionHeld = function()
+                local f = _G.ObjectiveTrackerFrame
+                return not f:IsInitialized() or f:IsInDefaultPosition()
+            end,
             setHeight = function(_, h)
                 h = math.floor(h / HEIGHT_STEP + 0.5) * HEIGHT_STEP
                 EQT.Set("height", math.max(HEIGHT_MIN, math.min(HEIGHT_MAX, h)))

@@ -2709,6 +2709,10 @@ EllesmereUI._IS_STANDALONE  = IS_STANDALONE
 --               applies): anchor links never move it and it offers no link or
 --               screen-edge menu, so no link becomes a third owner of the frame.
 --               Mover drags and nudges still move it and save through savePos
+--    isPositionHeld (function(key)) -> bool  true while something else places
+--               the frame (the quest tracker inside Blizzard's managed frame
+--               container): outside an unlock session, saved positions and
+--               anchor links leave it where it is
 --    linkedKeys (table)  list of element keys that move with this one
 --    noResize   (boolean) true for Blizzard elements that cannot be resized
 --    sizeFixedByLook (boolean) the current look fixes the element's size
@@ -2751,6 +2755,7 @@ function EllesmereUI.MakeUnlockElement(opts)
         isAnchored    = opts.isAnchored,
         onLiveMove    = opts.onLiveMove,
         ownsPosition  = opts.ownsPosition,
+        isPositionHeld = opts.isPositionHeld,
         linkedKeys    = opts.linkedKeys,
         noResize          = opts.noResize,
         linkedDimensions  = opts.linkedDimensions,
