@@ -602,16 +602,13 @@ do
         if not EUI.ShowInputPopup then return end
         EUI:ShowInputPopup({
             title = EllesmereUI.L(title),
-            message = EllesmereUI.L("Enter amount in gold:"),
-            placeholder = "1137",
+            message = EllesmereUI.L("Enter an amount:"),
+            money = true,  -- gold / silver / copper boxes; onConfirm gets copper
             confirmText = ACCEPT,
             cancelText = CANCEL,
             modernBlizz = true,
-            onConfirm = function(text)
-                local gold = tonumber(text)
-                if gold and gold > 0 then
-                    onAccept(gold * 10000)
-                end
+            onConfirm = function(copper)
+                if copper and copper > 0 then onAccept(copper) end
             end,
         })
     end
