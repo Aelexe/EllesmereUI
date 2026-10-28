@@ -165,7 +165,6 @@ local function SyncTitle(v, title, count)
         -- a small square button holding the person icon
         local b = CreateFrame("Button", nil, hdr)
         b:SetSize(20, 20)
-        b:SetPoint("LEFT", title, "RIGHT", 8, 0)
         b.bg = b:CreateTexture(nil, "BACKGROUND")
         b.bg:SetAllPoints()
         b.bg:SetColorTexture(1, 1, 1, 0.06)
@@ -179,7 +178,7 @@ local function SyncTitle(v, title, count)
         b:SetScript("OnEnter", function(self)
             self.arrow:SetAlpha(1)
             self.bg:SetColorTexture(1, 1, 1, 0.14)
-            EUI.ShowWidgetTooltip(self, EllesmereUI.L("Choose a character"))
+            EUI.ShowWidgetTooltip(self, EllesmereUI.L("Choose an alt"))
         end)
         b:SetScript("OnLeave", function(self)
             self.arrow:SetAlpha(0.8)
@@ -190,8 +189,16 @@ local function SyncTitle(v, title, count)
     end
     count:ClearAllPoints()
     local p = v.pick
+    -- the title's own spot (the bags move it for the sidebar arrow); the
+    -- button takes it and the title follows the button
+    local pt, rel, relPt, x, y = title:GetPoint(1)
+    if p and rel ~= p.btn then p.base = { pt, rel, relPt, x, y } end
     if p then p.btn:SetShown(on) end
     if not on then
+        if p and p.base then
+            title:ClearAllPoints()
+            title:SetPoint(unpack(p.base))
+        end
         title:SetText(v.plain())
         count:SetPoint("LEFT", title, "RIGHT", 8, 0)
         return
@@ -200,7 +207,11 @@ local function SyncTitle(v, title, count)
     local name = (c and c.name) or UnitName("player") or ""
     local class = (c and c.class) or select(2, UnitClass("player"))
     title:SetText(v.word(Hex(class) .. name .. "|r"))
-    count:SetPoint("LEFT", p.btn, "RIGHT", 8, 0)
+    p.btn:ClearAllPoints()
+    p.btn:SetPoint("LEFT", p.base[2], p.base[3], p.base[4], p.base[5])
+    title:ClearAllPoints()
+    title:SetPoint("LEFT", p.btn, "RIGHT", 8, 0)
+    count:SetPoint("LEFT", title, "RIGHT", 8, 0)
 end
 
 -- closing a window goes back to this character

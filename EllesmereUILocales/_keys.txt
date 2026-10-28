@@ -327,7 +327,7 @@ Choose Buff
 Choose Icon
 Choose Zones
 Choose a buff from the bar menu
-Choose a character
+Choose an alt
 Choose the specs this action menu works in.
 Choose which addons to import. Any addons not included will use your active profile's settings in the new profile.
 Choose which addons to include in your exported profile. Check everything for a full profile export.
