@@ -26,7 +26,9 @@ local GetItemInfo, GetItemInfoInstant = C_Item.GetItemInfo, C_Item.GetItemInfoIn
 local _emptyP = {}
 local function BP() return (EUI._bagsDB and EUI._bagsDB.profile) or _emptyP end
 
-local SLOT_SIZE, SPACING = 34, 4
+-- the bags' slot size, following its slider where the build has one
+local SLOT_SIZE, SPACING = ns.SLOT_SIZE or 34, ns.SPACING or 4
+if ns.OnSlotMetrics then ns.OnSlotMetrics(function(m) SLOT_SIZE, SPACING = m[1], m[2] end) end
 local BAR_H, PAD = 24, 10  -- same height as the sidebar header
 local ITEM_CLASS_WEAPON, ITEM_CLASS_ARMOR = Enum.ItemClass.Weapon, Enum.ItemClass.Armor
 local BANK_VIEW = -3
@@ -360,7 +362,7 @@ local function Slot(v, i)
     local b = v.slots[i]
     if b then return b end
     b = CreateFrame("Button", nil, v.child)
-    b:SetSize(SLOT_SIZE, SLOT_SIZE)
+    if ns.SizeSlot then ns.SizeSlot(b) else b:SetSize(SLOT_SIZE, SLOT_SIZE) end
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetAllPoints()
     b.Count = b:CreateFontString(nil, "OVERLAY")
@@ -632,7 +634,7 @@ local function Signature(v, list, query, gold, age)
     local r, g, b = 0, 0, 0
     if EUI.GetAccentColor then r, g, b = EUI.GetAccentColor() end
     return strjoin("|", tostring(v.mode), tostring(list), Offline.Rev(), query, v.viewTab, tostring(sel),
-        tostring(group), math.floor(v.panel:GetWidth() + 0.5), catGen, GetFont(), tostring(gold), tostring(age),
+        tostring(group), math.floor(v.panel:GetWidth() + 0.5), SLOT_SIZE, SPACING, catGen, GetFont(), tostring(gold), tostring(age),
         tostring(p.bagItemIconZoom), tostring(p.bagCountFontSize), tostring(p.itemlevelFontSize),
         tostring(p.showItemlevelInBags), tostring(p.bagQualityBorder), tostring(p.bagCatTitleSize),
         tostring(p.bankSidebarCollapsed), tostring(p.bankHideTabsInSidebar), tostring(p.bankCategorySidebar),
