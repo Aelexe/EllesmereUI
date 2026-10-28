@@ -787,7 +787,10 @@ if EUI_Bank then
                 end
             end
             local function One() entries[#entries + 1] = { key = "one" .. kind, name = one, icon = oneIcon, n = total } end
+            local first = #entries + 1
             if oneFirst then One(); All() else All(); One() end
+            -- the warbank's views sit apart from the bank's
+            if first > 1 then entries[first].split = true end
         end
         Add("bank", EllesmereUI.L("All Bank Tabs"), EllesmereUI.L("OneBank"), 413587, 1542860, c and c.bank, "CharacterBankTab_")
         Add("warband", EllesmereUI.L("All Warbank Tabs"), EllesmereUI.L("OneWarbank"), 1542854, 1542854, Offline.Warband().tabs, "AccountBankTab_")
@@ -797,7 +800,24 @@ if EUI_Bank then
         local r, g, b = 0.05, 0.82, 0.62
         if EUI.GetAccentColor then r, g, b = EUI.GetAccentColor() end
         local y = 0
+        local px = (EUI.PP and EUI.PP.mult) or 1
+        if not side._div then
+            side._div = side:CreateTexture(nil, "ARTWORK")
+            side._div:SetColorTexture(0.2, 0.2, 0.2, 1)
+        end
+        side._div:Hide()
         for i, e in ipairs(entries) do
+            -- a divider like the live sidebar's
+            if e.split then
+                y = y - 4
+                local inset = math.floor(w * 0.08)
+                side._div:ClearAllPoints()
+                side._div:SetHeight(px)
+                side._div:SetPoint("TOPLEFT", side, "TOPLEFT", inset, y)
+                side._div:SetPoint("TOPRIGHT", side, "TOPRIGHT", -inset, y)
+                side._div:Show()
+                y = y - px - 4
+            end
             local row = Row(i)
             row.key, row.name, row.n = e.key, e.name, e.n
             row.on = e.key == v.viewTab

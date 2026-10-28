@@ -3009,6 +3009,26 @@ function BuildBankSidebar()
     -- View indices: 0 = All Bank Tabs, -1 = OneBank, -2 = All Warbank Tabs, -3 = OneWarbank
     -- >0 = individual tab index in _allTabs
 
+    -- Divider
+    local function ShowDivider(key)
+        if not sidebarChild[key] then
+            local PP = EUI and EUI.PP
+            local px = (PP and PP.mult) or 1
+            local div = sidebarChild:CreateTexture(nil, "ARTWORK")
+            div:SetHeight(px)
+            div:SetColorTexture(0.2, 0.2, 0.2, 1)
+            sidebarChild[key] = div
+        end
+        y = y - 4
+        local div = sidebarChild[key]
+        div:ClearAllPoints()
+        local inset = math.floor(sidebarW * 0.08)
+        div:SetPoint("TOPLEFT", sidebarChild, "TOPLEFT", inset, y)
+        div:SetPoint("TOPRIGHT", sidebarChild, "TOPRIGHT", -inset, y)
+        div:Show()
+        y = y - (div:GetHeight() or 1) - 4
+    end
+
     -- Physical tabs can be hidden once the category list is doing the
     -- navigating, but only when it is actually on -- otherwise the sidebar
     -- would have nothing left to click.
@@ -3040,33 +3060,16 @@ function BuildBankSidebar()
     for _, tab in ipairs(_allTabs) do
         if tab.isWarband then hasWarband = true; break end
     end
+    if sidebarChild._warbandViewDivider then sidebarChild._warbandViewDivider:Hide() end
     if hasWarband then
+        -- the bank's views and the warbank's, apart
+        if not _warbandOnly then ShowDivider("_warbandViewDivider") end
         local function All()
             RenderSidebarEntry(-2, EllesmereUI.L("All Warbank Tabs"), 1542854, warbUsed, selView == -2)
             NestTabs(true)
         end
         local function One() RenderSidebarEntry(-3, EllesmereUI.L("OneWarbank"), 1542854, warbUsed, selView == -3) end
         if defaultOneBag then One(); All() else All(); One() end
-    end
-
-    -- Divider
-    local function ShowDivider(key)
-        if not sidebarChild[key] then
-            local PP = EUI and EUI.PP
-            local px = (PP and PP.mult) or 1
-            local div = sidebarChild:CreateTexture(nil, "ARTWORK")
-            div:SetHeight(px)
-            div:SetColorTexture(0.2, 0.2, 0.2, 1)
-            sidebarChild[key] = div
-        end
-        y = y - 4
-        local div = sidebarChild[key]
-        div:ClearAllPoints()
-        local inset = math.floor(sidebarW * 0.08)
-        div:SetPoint("TOPLEFT", sidebarChild, "TOPLEFT", inset, y)
-        div:SetPoint("TOPRIGHT", sidebarChild, "TOPRIGHT", -inset, y)
-        div:Show()
-        y = y - (div:GetHeight() or 1) - 4
     end
 
     -- Category entries, mirroring the bags sidebar: group header, then its
