@@ -159,6 +159,30 @@ initFrame:SetScript("OnEvent", function(self)
                     EllesmereUI.BlankRowCfg()
                 ); y = y - h
 
+                -- Offline Bank (EllesmereUIBags_Offline.lua; absent on WoW Forever)
+                local Offline = BagsNS and BagsNS.Offline
+                if Offline then
+                    _, h = W:SectionHeader(parent, "OFFLINE BANK", y); y = y - h
+                    _, h = W:DualRow(parent, y,
+                        { type="toggle", text="Offline Bank",
+                          tooltip="Saves each character's bags and bank, and the warband bank, when you see them. The Bank icon in the bags header then shows them from anywhere, for any of your characters.",
+                          getValue=function() return db.profile.bagOfflineBank ~= false end,
+                          setValue=function(v)
+                              db.profile.bagOfflineBank = v and true or false
+                              Offline.Sync()
+                              Offline.SyncButton()
+                          end },
+                        { type="toggle", text="Tooltip Item Counts",
+                          tooltip="Item tooltips list how many of that item each of your characters has in their bags and bank, plus the warband bank.",
+                          getValue=function() return db.profile.bagTooltipCounts ~= false end,
+                          setValue=function(v)
+                              db.profile.bagTooltipCounts = v and true or false
+                              Offline.Sync()
+                              Offline.SyncTooltip()
+                          end }
+                    ); y = y - h
+                end
+
                 _, h = W:Spacer(parent, y, 20); y = y - h
                 return math.abs(y)
                 end) -- end pcall

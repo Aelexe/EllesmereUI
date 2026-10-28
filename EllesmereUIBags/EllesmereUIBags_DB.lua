@@ -56,6 +56,8 @@ local BAGS_DEFAULTS = {
         bagWindowLocked       = false,   -- footer lock icon: no resizing or moving
         bankWindowLocked      = false,
         bagOpenWithCharacter  = false,
+        bagOfflineBank        = true,    -- Offline Bank: saved bags / banks, the header Bank icon (EllesmereUIBags_Offline.lua)
+        bagTooltipCounts      = true,    -- Tooltip Item Counts from the same saved copies
         -- bagFrameStrata has no default: unset reads the retired
         -- bagAllowWindowsOverBags (ns.BagFrameStrata)
         bagStackSplitter      = false,

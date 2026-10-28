@@ -571,6 +571,9 @@ function EUI_Bags:SyncHeaderIcons()
     else
         EUI_BagsWindow:Hide()  -- opened only from Show Bags
     end
+    -- Offline Bank (EllesmereUIBags_OfflineView.lua), absent on WoW Forever
+    local offline = ns.SyncOfflineIcon and ns.SyncOfflineIcon(prev, gap)
+    if offline then prev, gap = offline, 6 end
     -- Quick Actions (EllesmereUIBags_QuickActions.lua), off by default
     local quick = ns.SyncQuickActionsIcon(prev, gap)
     if quick then prev, gap = quick, 6 end
