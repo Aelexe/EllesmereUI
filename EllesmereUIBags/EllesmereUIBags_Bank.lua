@@ -208,6 +208,7 @@ bgAtlas:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png")
 local bgOverlay = EUI_Bank:CreateTexture(nil, "BACKGROUND", nil, 1)
 bgOverlay:SetAllPoints()
 bgOverlay:SetColorTexture(0, 0, 0, 0.25)
+EUI_Bank._bg, EUI_Bank._bgOverlay = bgAtlas, bgOverlay  -- Background Color / Opacity
 EUI.MakeBorder(EUI_Bank, 1, 1, 1, 0.15, EUI.PP)
 
 -------------------------------------------------------------------------------
@@ -2091,6 +2092,7 @@ local _bankListGripCfg = setmetatable({
 local BuildBankSidebar  -- defined further down
 function EUI_Bank:RefreshBank()
     if not EUI_Bank:IsVisible() then return end
+    ns.ApplyWindowBackground(bgAtlas, bgOverlay)
     NotifyBankTypeForTSM()
 
     -- Re-discover tabs if empty (data may not be ready on the same frame as
@@ -2545,7 +2547,7 @@ function EUI_Bank:RefreshBank()
             btn:SetItemButtonCount(0)
             SetItemButtonDesaturated(btn, false)
             if btn.icon then btn.icon:Hide() end
-            btn._emptyBg:Show(); btn._emptyBg:SetAlpha(0.35)
+            btn._emptyBg:Show(); ns.PaintSlotBackground(btn._emptyBg, 0.35)
             btn:EnableMouse(true)
             SetInsetBorderColor(btn, 0, 0, 0, 0.3)
             if btn.Cooldown then btn.Cooldown:Clear() end
