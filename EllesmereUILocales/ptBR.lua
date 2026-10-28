@@ -1809,8 +1809,10 @@ L["Unlock Window to Close"] = "Desbloquear janela para fechar"
 L["Unlocked"] = "Desbloqueada"
 L["Zoom"] = "Zoom"
 
--- == UI Reskin Addons category ================================================
-L["UI Reskin Addons"] = "Addons de Reestilização de UI"
+-- == Sidebar groups ===========================================================
+L["Secondary Addons"] = "Addons Secundários"
+L["Utility Addons"] = "Addons de Utilidade"
+L["UI Enhancements"] = "Aprimoramentos de UI"
 
 -- == Bags ======================================================================
 L["Bags"] = "Bolsas"
@@ -6929,7 +6931,6 @@ L["Configure alerts for missing Beacon of Light or Faith."] = "Configure alertas
 
 -- == Global Settings / Addon Detection ================================================
 L["Core Addons"] = "Addons Principais"
-L["QoL Addons"] = "Addons de QoL"
 L["Incompatible Addon Detected"] = "Addon Incompatível Detectado"
 L["Out of Date"] = "Desatualizado"
 
@@ -9349,7 +9350,7 @@ L["Bountiful this week"] = "Abundante nesta semana"
 L["Brazil"] = "Brasil"
 L["Bulk Buy stopped after %1$d of %2$d."] = "A compra em massa parou após %1$d de %2$d."
 L["Cancel Oldest Application"] = "Cancelar candidatura mais antiga"
-L["Cannot open options during combat. Group Finder is under UI Reskin Addons in /eui."] = "Não é possível abrir as opções em combate. O Buscador de Grupo fica em Addons de Reestilização de UI em /eui."
+L["Cannot open options during combat. Group Finder is under UI Enhancements in /eui."] = "Não é possível abrir as opções em combate. O Buscador de Grupo fica em Aprimoramentos de UI em /eui."
 L["Choose which Blizzard elements to hide."] = "Escolha quais elementos da Blizzard ocultar."
 L["Choose which application results show on the bar."] = "Escolha quais resultados de candidatura aparecem na barra."
 L["Choose which raids' bosses are shown"] = "Escolha de quais raides os chefes são exibidos"
@@ -9393,7 +9394,7 @@ L["Graveyard, Library, Armory, Cathedral"] = "Cemitério, Biblioteca, Arsenal, C
 L["Green name when a group is new, Red name when you were declined or instance locked. Uses Raider.IO colors when loaded."] = "Nome verde quando o grupo é novo, nome vermelho quando você foi recusado ou está preso à instância. Usa as cores do Raider.IO quando carregado."
 L["Group Filters Settings"] = "Configurações dos Filtros de Grupo"
 L["Group Finder has been turned off because Premade Groups Filter is loaded."] = "O Buscador de Grupo foi desativado porque o Premade Groups Filter está carregado."
-L["Group Finder is under UI Reskin Addons in /eui."] = "O Buscador de Grupo fica em Addons de Reestilização de UI em /eui."
+L["Group Finder is under UI Enhancements in /eui."] = "O Buscador de Grupo fica em Aprimoramentos de UI em /eui."
 L["Group Settings"] = "Configurações do Grupo"
 L["Group tooltips add each member's name (dungeons and arenas, where Blizzard already lists the roles and classes), or a line per member with role, specialization, class and name (other groups)."] = "As dicas de grupo acrescentam o nome de cada membro (masmorras e arenas, onde a Blizzard já lista as funções e classes), ou uma linha por membro com função, especialização, classe e nome (outros grupos)."
 L["Halfway Color"] = "Cor Intermediária"
@@ -9519,7 +9520,7 @@ L["Tracks your current zone's or dungeon's quests and untracks them when you lea
 L["Tram to %s"] = "Metrô para %s"
 L["Transports"] = "Transportes"
 L["Turn It On"] = "Ativar"
-L["Turning it on reloads your UI. Group Finder is under UI Reskin Addons in /eui."] = "Ativar recarrega a sua interface. O Buscador de Grupo fica em Addons de Reestilização de UI em /eui."
+L["Turning it on reloads your UI. Group Finder is under UI Enhancements in /eui."] = "Ativar recarrega a sua interface. O Buscador de Grupo fica em Aprimoramentos de UI em /eui."
 L["Unlocks Sort Quests, Filter Quests and Auto Track Zone Quests."] = "Libera Ordenar Missões, Filtrar Missões e Rastrear Missões da Zona Automaticamente."
 L["Untracks quests that match the filters in the cog until they no longer match."] = "Deixa de rastrear missões que correspondem aos filtros da engrenagem até que deixem de corresponder."
 L["West"] = "Oeste"

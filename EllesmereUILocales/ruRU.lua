@@ -372,8 +372,9 @@ L["Choose which addons you want enabled. You can change any of these later in th
 L["Check All"]         = "Отметить все"
 L["Uncheck All"]       = "Снять отметки"
 L["Core Addons"]       = "Основные аддоны"
-L["QoL Addons"]        = "Аддоны удобства"
-L["UI Reskin Addons"]  = "Оформление аддонов"
+L["Secondary Addons"]  = "Вторичные аддоны"
+L["Utility Addons"]    = "Аддоны-утилиты"
+L["UI Enhancements"]   = "Улучшения интерфейса"
 L["Coming soon"]       = "Скоро"
 L["Reload UI"]         = "Перезагрузить"
 

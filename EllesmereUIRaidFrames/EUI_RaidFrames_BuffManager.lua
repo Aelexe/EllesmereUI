@@ -1859,59 +1859,18 @@ function ns.BM_BuildSimplePreview(parent, s, fontPath, PP, centerX, topY, opts)
         end
     end
 
-    -- Name text on a carrier in the live text band (ns.LVL_TEXT) so it draws above the +8 main border, exactly like real frames.
-    local nameCarrier = CreateFrame("Frame", nil, pvFrame)
-    nameCarrier:SetAllPoints(pvFrame)
-    nameCarrier:SetFrameLevel(pvFrame:GetFrameLevel() + (ns.LVL_TEXT or 12))
-    local nameFS = nameCarrier:CreateFontString(nil, "OVERLAY")
+    -- The texts on a carrier in the live text band (ns.LVL_TEXT) so they draw above the +8 main border, exactly like real
+    -- frames; the name's Show Above Icons lifts it over the aura band as live (texts set otherwise get their own carrier).
+    local textCarrier = CreateFrame("Frame", nil, pvFrame)
+    textCarrier:SetAllPoints(pvFrame)
+    textCarrier:SetFrameLevel(pvFrame:GetFrameLevel()
+        + (s.nameTextAboveIcons and (ns.LVL_AURA + 6) or (ns.LVL_TEXT or 12)))
     local outline = (EllesmereUI.GetFontOutlineFlag("raidFrames")) or ""
-    EllesmereUI.PrimeFontShadow(nameFS, outline == "" and EllesmereUI.GetFontUseShadow("raidFrames"))
-    nameFS:SetFont(fontPath, s.nameSize or 10, outline)
-    nameFS:SetWordWrap(false)
-    local npos = s.namePosition or "center"
-    nameFS:SetShown(npos ~= "none" and not s.topNameBarEnabled)
-    local nox = s.nameOffsetX or 0
-    local noy = s.nameOffsetY or 0
-    nameFS:SetPoint("LEFT", health, "LEFT", 2 + nox, 0)
-    nameFS:SetPoint("RIGHT", health, "RIGHT", -floor(rawW * 0.25) + nox, 0)
-    if npos == "topleft" then
-        nameFS:SetPoint("TOP", health, "TOP", 0, -2 + noy); nameFS:SetJustifyH("LEFT"); nameFS:SetJustifyV("TOP")
-    elseif npos == "top" then
-        nameFS:SetPoint("TOP", health, "TOP", 0, -2 + noy); nameFS:SetJustifyH("CENTER"); nameFS:SetJustifyV("TOP")
-    elseif npos == "topright" then
-        nameFS:SetPoint("TOP", health, "TOP", 0, -2 + noy); nameFS:SetJustifyH("RIGHT"); nameFS:SetJustifyV("TOP")
-    elseif npos == "left" then
-        nameFS:SetPoint("CENTER", health, "CENTER", 0, noy); nameFS:SetJustifyH("LEFT"); nameFS:SetJustifyV("MIDDLE")
-    elseif npos == "right" then
-        nameFS:SetPoint("CENTER", health, "CENTER", 0, noy); nameFS:SetJustifyH("RIGHT"); nameFS:SetJustifyV("MIDDLE")
-    elseif npos == "bottomleft" then
-        nameFS:SetPoint("BOTTOM", health, "BOTTOM", 0, 2 + noy); nameFS:SetJustifyH("LEFT"); nameFS:SetJustifyV("BOTTOM")
-    elseif npos == "bottom" then
-        nameFS:SetPoint("BOTTOM", health, "BOTTOM", 0, 2 + noy); nameFS:SetJustifyH("CENTER"); nameFS:SetJustifyV("BOTTOM")
-    else
-        nameFS:SetPoint("CENTER", health, "CENTER", 0, noy); nameFS:SetJustifyH("CENTER"); nameFS:SetJustifyV("MIDDLE")
-    end
     local playerName = UnitName("player") or "Player"
     if Ambiguate then playerName = Ambiguate(playerName, "short") end
     if ns.RF_FormatName then playerName = ns.RF_FormatName(playerName, s) end
-    -- Level Position "Attach to Name" (either format): the level in front of the name.
-    local lvlPos = s.levelTextPosition or ns.RF_LEVEL_DEFAULT
-    local lvlAttach = ns.RF_LEVEL_ATTACH[lvlPos]
-    if lvlAttach then
-        nameFS:SetFormattedText(lvlAttach[1], ns._RFPreviewLevel(), playerName)
-    else
-        nameFS:SetText(playerName)
-    end
-    local nameMode = s.nameColorMode or "class"
-    if nameMode == "accent" then
-        local ar, ag, ab = EllesmereUI.ResolveActiveAccent()
-        if ar then nameFS:SetTextColor(ar, ag, ab) else nameFS:SetTextColor(1, 1, 1) end
-    elseif nameMode == "custom" then
-        local c = s.nameCustomColor or { r=1, g=1, b=1 }
-        nameFS:SetTextColor(c.r, c.g, c.b)
-    else
-        if cc then nameFS:SetTextColor(cc.r, cc.g, cc.b) else nameFS:SetTextColor(1, 1, 1) end
-    end
+    -- Level Position "Attach to Name" (either format): the Top Name Bar shows the level too.
+    local lvlAttach = ns.RF_TextNameAttach(s)
 
     -- Top Name Bar band (preview replica)
     if s.topNameBarEnabled then
@@ -1959,62 +1918,14 @@ function ns.BM_BuildSimplePreview(parent, s, fontPath, PP, centerX, topY, opts)
         if s.topNameBarDivider == true then ns.RF_ApplyTopNameDivider(tnb, s, true) end
     end
 
-    local htMode = s.healthTextMode or "none"
-    if htMode ~= "none" then
-        local htFS = health:CreateFontString(nil, "OVERLAY")
-        htFS:SetFont(fontPath, s.healthTextSize or 9, outline)
-        htFS:SetTextColor(1, 1, 1, 0.9)
-        local htPos = s.healthTextPosition or "center"
-        local htOX = s.healthTextOffsetX or 0
-        local htOY = s.healthTextOffsetY or 0
-        htFS:SetWidth(rawW * 0.75); htFS:SetHeight(0)
-        if htPos == "topleft" then
-            htFS:SetPoint("TOPLEFT", health, "TOPLEFT", 2 + htOX, -2 + htOY); htFS:SetJustifyH("LEFT"); htFS:SetJustifyV("TOP")
-        elseif htPos == "top" then
-            htFS:SetPoint("TOP", health, "TOP", htOX, -2 + htOY); htFS:SetJustifyH("CENTER"); htFS:SetJustifyV("TOP")
-        elseif htPos == "topright" then
-            htFS:SetPoint("TOPRIGHT", health, "TOPRIGHT", -2 + htOX, -2 + htOY); htFS:SetJustifyH("RIGHT"); htFS:SetJustifyV("TOP")
-        elseif htPos == "left" then
-            htFS:SetPoint("LEFT", health, "LEFT", 2 + htOX, htOY); htFS:SetJustifyH("LEFT"); htFS:SetJustifyV("MIDDLE")
-        elseif htPos == "right" then
-            htFS:SetPoint("RIGHT", health, "RIGHT", -2 + htOX, htOY); htFS:SetJustifyH("RIGHT"); htFS:SetJustifyV("MIDDLE")
-        elseif htPos == "bottomleft" then
-            htFS:SetPoint("BOTTOMLEFT", health, "BOTTOMLEFT", 2 + htOX, 2 + htOY); htFS:SetJustifyH("LEFT"); htFS:SetJustifyV("BOTTOM")
-        elseif htPos == "bottom" then
-            htFS:SetPoint("BOTTOM", health, "BOTTOM", htOX, 2 + htOY); htFS:SetJustifyH("CENTER"); htFS:SetJustifyV("BOTTOM")
-        else
-            htFS:SetPoint("CENTER", health, "CENTER", htOX, htOY); htFS:SetJustifyH("CENTER"); htFS:SetJustifyV("MIDDLE")
-        end
-        if htMode == "percent" then htFS:SetText("85%")
-        elseif htMode == "percentNoSign" then htFS:SetText("85")
-        elseif htMode == "number" then htFS:SetText(AbbreviateNumbers(1020000)) end
-    end
-
-    -- Power text on the replica's power sample (72% mana), shown only with it like the live frames.
-    if rawPowerH > 0 and (s.powerTextMode or "none") ~= "none" then
-        local ptFS = nameCarrier:CreateFontString(nil, "OVERLAY")
-        EllesmereUI.PrimeFontShadow(ptFS, outline == "" and EllesmereUI.GetFontUseShadow("raidFrames"))
-        ptFS:SetFont(fontPath, s.powerTextSize or 8, outline)
-        ptFS:SetWordWrap(false)
-        ns.AnchorRFText(ptFS, health, s.powerTextPosition or "bottom",
-            s.powerTextOffsetX or 0, s.powerTextOffsetY or 0, rawW * 0.75)
-        ns.RF_PowerTextInto(ptFS, s.powerTextMode, 72, nil, nil, 2500)
-        local pr, pg, pb = ns.RF_PreviewTextColor(s.powerTextColorMode or "custom",
-            s.powerTextCustomColor, previewClass, 1, 1, 1, "MANA")
-        ptFS:SetTextColor(pr, pg, pb, 0.9)
-    end
-
-    -- Level text on its own spot, in the name's colour, like the live frames.
-    if lvlPos ~= "none" and not lvlAttach then
-        local lvFS = nameCarrier:CreateFontString(nil, "OVERLAY")
-        EllesmereUI.PrimeFontShadow(lvFS, outline == "" and EllesmereUI.GetFontUseShadow("raidFrames"))
-        lvFS:SetFont(fontPath, s.levelTextSize or 10, outline)
-        lvFS:SetWordWrap(false)
-        ns.AnchorRFText(lvFS, health, lvlPos, s.levelTextOffsetX or 0, s.levelTextOffsetY or 0)
-        lvFS:SetFormattedText("%d", ns._RFPreviewLevel())
-        lvFS:SetTextColor(ns.RF_PreviewTextColor(s.nameColorMode or "class",
-            s.nameCustomColor, previewClass, 1, 1, 1))
-    end
+    -- The texts as live, from this replica's sample values (85% health, 72% mana,
+    -- shown with the power sample only). A fresh state per build: the carrier's pooled
+    -- FontStrings come back through the pool.
+    ns.RF_TextPreview({ textCarrier = textCarrier, _health = health, _txW = rawW }, s, {
+        hpPct = 85, hpPer = 12000, ppPct = 72, ppPer = 2500, ha = 85 * 3000,
+        name = ns.CapName(playerName, s), power = rawPowerH > 0 or nil,
+        class = previewClass, pToken = "MANA",
+    })
 
     pvFrame._health = health
     -- Settings source for every later indicator pass on this replica (nil = the caller's).

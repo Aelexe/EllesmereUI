@@ -311,6 +311,8 @@ local function BuildRowLabelMenu(rgn, opts)
     arrow:SetTexture(ROW_MENU_ARROW)
     arrow:SetSize(17, 17)
     arrow:SetPoint("LEFT", label, "LEFT", math.ceil(label:GetStringWidth()) + 6, -1)
+    -- The label clamp (QueueLabelClamp) keeps room for it and moves it with a cut label.
+    rgn._labelArrow = arrow
     btn:SetPoint("TOPLEFT", label, "TOPLEFT", -4, 5)
     btn:SetPoint("BOTTOMRIGHT", arrow, "BOTTOMRIGHT", 2, -2)
     local menu

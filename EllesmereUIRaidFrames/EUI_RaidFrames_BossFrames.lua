@@ -16,6 +16,7 @@ local wipe         = wipe
 local UnitClass             = UnitClass
 local UnitExists            = UnitExists
 local UnitIsDeadOrGhost     = UnitIsDeadOrGhost
+local UnitIsConnected       = UnitIsConnected
 local UnitIsUnit            = UnitIsUnit
 local IsInRaid              = IsInRaid
 local InCombatLockdown      = InCombatLockdown
@@ -24,10 +25,9 @@ local C_Timer               = C_Timer
 local issecretvalue         = issecretvalue
 local CreateFrame           = CreateFrame
 
-local ApplyFont, GetFFD, PixelSnap = I.ApplyFont, I.GetFFD, I.PixelSnap
+local GetFFD, PixelSnap = I.GetFFD, I.PixelSnap
 local ResolveHealthTexture, separatedHdrs = I.ResolveHealthTexture, I.separatedHdrs
-local GetHealthTextColor, GetNameColor = I.GetHealthTextColor, I.GetNameColor
-local GetSafeHealthPercent, ResolveDisplayName = I.GetSafeHealthPercent, I.ResolveDisplayName
+local GetSafeHealthPercent = I.GetSafeHealthPercent
 
 local db
 I.dbSetters[#I.dbSetters + 1] = function(v) db = v end
@@ -167,43 +167,6 @@ FB.ShouldBeActive = function()
     return false
 end
 
--- Anchor a FontString using the same position vocabulary as AnchorNameText/AnchorHealthText.
-FB.AnchorText = function(fs, health, pos, ox, oy)
-    fs:ClearAllPoints()
-    if pos == "topleft" then
-        fs:SetPoint("TOPLEFT", health, "TOPLEFT", 2 + ox, -2 + oy)
-        fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
-    elseif pos == "top" then
-        fs:SetPoint("TOP", health, "TOP", ox, -2 + oy)
-        fs:SetJustifyH("CENTER"); fs:SetJustifyV("TOP")
-    elseif pos == "topright" then
-        fs:SetPoint("TOPRIGHT", health, "TOPRIGHT", -2 + ox, -2 + oy)
-        fs:SetJustifyH("RIGHT"); fs:SetJustifyV("TOP")
-    elseif pos == "left" then
-        fs:SetPoint("LEFT", health, "LEFT", 2 + ox, oy)
-        fs:SetJustifyH("LEFT"); fs:SetJustifyV("MIDDLE")
-    elseif pos == "right" then
-        fs:SetPoint("RIGHT", health, "RIGHT", -2 + ox, oy)
-        fs:SetJustifyH("RIGHT"); fs:SetJustifyV("MIDDLE")
-    elseif pos == "bottomleft" then
-        fs:SetPoint("BOTTOMLEFT", health, "BOTTOMLEFT", 2 + ox, 2 + oy)
-        fs:SetJustifyH("LEFT"); fs:SetJustifyV("BOTTOM")
-    elseif pos == "bottom" then
-        fs:SetPoint("BOTTOM", health, "BOTTOM", ox, 2 + oy)
-        fs:SetJustifyH("CENTER"); fs:SetJustifyV("BOTTOM")
-    elseif pos == "bottomright" then
-        fs:SetPoint("BOTTOMRIGHT", health, "BOTTOMRIGHT", -2 + ox, 2 + oy)
-        fs:SetJustifyH("RIGHT"); fs:SetJustifyV("BOTTOM")
-    else -- "center"
-        fs:SetPoint("CENTER", health, "CENTER", ox, oy)
-        fs:SetJustifyH("CENTER"); fs:SetJustifyV("MIDDLE")
-    end
-    -- Force re-render after a JustifyH change
-    local txt = fs:GetText()
-    fs:SetText("")
-    fs:SetText(txt or "")
-end
-
 -- Recolor the border for the current state. Mirrors the raid buttons' single recolored border:
 -- hover (raised) > target (raised) > normal, using the button's border settings (FB.Source: the raid
 -- ones for the boss group) -- nothing separate.
@@ -325,16 +288,22 @@ FB.PaintBarColor = function(b, owner, s)
         fbc and fbc.b or 49/255, (s.healthBarOpacity or 100) / 100)
 end
 
+-- Text state of a button built with its texts (FB.BuildVisuals): the FontStrings, the
+-- plan and the settings they were last painted with, kept off the (possibly header-made) button.
+FB.txs = setmetatable({}, { __mode = "k" })
+
+-- Name texts only (name events).
 FB.PaintName = function(b, unit, s)
-    local fs = b._nameText
-    if not fs then return end
-    fs:SetText(ResolveDisplayName(unit, true, s))
-    local nr, ng, nb = GetNameColor(unit, s)
-    fs:SetTextColor(nr, ng, nb)
+    local st = FB.txs[b]
+    if not st then return end
+    ns._RFTextReady(st, s)
+    ns.RF_TextNames(st, unit)
 end
 
--- Health value, health text and heal absorb text. A text set to None is blank: the full paint (full)
--- clears it, and the health events after it skip it.
+-- Health value and the texts. full: the full paint (every text); otherwise a health event,
+-- which repaints Health and Heal Absorb Text and every Custom text: these trackers carry health
+-- and name events only, so Custom's power, absorb, group and target tags refresh here, not on
+-- their own events. No level and no Power Text here (no power bar).
 FB.PaintHealth = function(b, unit, s, full)
     local health = b._health
     local pct = GetSafeHealthPercent(unit)
@@ -348,32 +317,15 @@ FB.PaintHealth = function(b, unit, s, full)
     if health._euiInv then barPct = GetSafeHealthPercent(unit, true) end
     if smooth then health:SetValue(barPct, smooth) else health:SetValue(barPct) end
 
-    local ht, hat = b._healthText, b._healAbsorbText
-    local mode = s.healthTextMode or "none"
-    if ht and mode == "none" then
-        if full then ht:SetText("") end
-        ht = nil
+    local st = FB.txs[b]
+    if not st then return end
+    if full then
+        ns.RF_TextFull(st, s, unit)
+        return
     end
-    if hat and (s.healAbsorbTextMode or "none") == "none" then
-        if full then hat:SetText("") end
-        hat = nil
-    end
-    if not (ht or hat) then return end
-    local dead = UnitIsDeadOrGhost(unit)
-
-    if ht then
-        if dead then
-            ht:SetText("")
-        else
-            ns.RF_HealthTextInto(ht, mode, pct, unit)
-        end
-        local htr, htg, htb = GetHealthTextColor(unit, s)
-        ht:SetTextColor(htr, htg, htb, 0.9)
-    end
-
-    if hat then
-        if dead then hat:SetText("")
-        else ns.SetHealAbsorbText(hat, unit, s) end
+    local p = st._txP
+    if p and (p.tick or p.custom) then
+        ns.RF_TextHealth(st, unit, pct, UnitIsDeadOrGhost(unit) or not UnitIsConnected(unit), true)
     end
 end
 
@@ -390,18 +342,18 @@ FB.Update = function(b, owner)
     end
     local s = FB.Source(b)
     FB.PaintBarColor(b, owner or FB, s)
-    FB.PaintName(b, unit, s)
     FB.PaintHealth(b, unit, s, true)
     FB.ApplyBorderColor(b)
     return true
 end
 
--- Background, health bar, the three texts and the border frame of one button, kept on the button
--- itself with the stock styles' edge and highlight state. Shared with the pet frames and their
--- preview. The pet header's buttons are made by the pet header, not by us: these keys on them are
--- the one known exception to keeping state off header buttons (the rest lives in weak tables and
--- GetFFD).
-FB.BuildVisuals = function(b)
+-- Background, health bar, the texts and the border frame of one button, kept on the button itself
+-- with the stock styles' edge and highlight state. Shared with the pet frames, their preview and
+-- the party target frames. texts: the texts (FB.txs); without, the one name text the
+-- party target frames draw (they style it themselves). The pet header's buttons are made by the
+-- pet header, not by us: these keys on them are the one known exception to keeping state off
+-- header buttons (the rest lives in weak tables and GetFFD).
+FB.BuildVisuals = function(b, texts)
     local bg = b:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     if PP then PP.DisablePixelSnap(bg) end
@@ -419,15 +371,13 @@ FB.BuildVisuals = function(b)
     local carrier = CreateFrame("Frame", nil, b)
     carrier:SetAllPoints(health)
     carrier:SetFrameLevel(b:GetFrameLevel() + ns.LVL_TEXT)
-    local nameFS = carrier:CreateFontString(nil, "OVERLAY")
-    nameFS:SetWordWrap(false)
-    b._nameText = nameFS
-    local healthFS = carrier:CreateFontString(nil, "OVERLAY")
-    healthFS:SetWordWrap(false)
-    b._healthText = healthFS
-    local healAbsorbFS = carrier:CreateFontString(nil, "OVERLAY")
-    healAbsorbFS:SetWordWrap(false)
-    b._healAbsorbText = healAbsorbFS
+    if texts then
+        FB.txs[b] = { textCarrier = carrier, _txHost = health, _txFB = true }
+    else
+        local nameFS = carrier:CreateFontString(nil, "OVERLAY")
+        nameFS:SetWordWrap(false)
+        b._nameText = nameFS
+    end
 
     -- Border frame (same construction as the raid buttons; styled from the shared raid border settings in FB.StyleBorder)
     local bdr = CreateFrame("Frame", nil, b)
@@ -461,7 +411,7 @@ FB.EnsureBuilt = function()
             b:SetAttribute("*type2", "togglemenu")
         end
         b:Hide()
-        FB.BuildVisuals(b)
+        FB.BuildVisuals(b, true)
 
         -- Refresh as soon as the driver shows the button; visible-count drives the ticker lifecycle.
         b:HookScript("OnShow", function(self)
@@ -640,13 +590,16 @@ FB.ApplyStyle = function(owner)
 end
 
 -- The size-dependent part of FB.StyleVisuals (the health bar's height, the text widths): all a
--- resize of an already styled button needs.
-FB.SizeVisuals = function(b, w, h)
+-- resize of an already styled button needs. s: the settings of a full restyle; a resize keeps the
+-- settings the texts were laid out with.
+FB.SizeVisuals = function(b, w, h, s)
     -- No power bar / top name bar here: health fills the button.
     b._health:SetHeight(h)
-    b._nameText:SetWidth(w * ns.RF_NAME_WIDTH_FRACTION)
-    b._healthText:SetWidth(w * 0.75)
-    if b._healAbsorbText then b._healAbsorbText:SetWidth(w * 0.75) end
+    local st = FB.txs[b]
+    if st then
+        st._txW = w
+        if s or st._txL then ns.RF_TextLayout(st, s or st._txS) end
+    end
 end
 
 -- Texture, fonts, text anchors and border of one button at w x h. Shared with the pet frames.
@@ -662,27 +615,7 @@ FB.StyleVisuals = function(b, s, w, h, texPath, bgc)
     -- build ReanchorAbsorbToFill, where every other frame picks the swap up.
     b._health._euiFillOpacity = (s.healthBarOpacity or 100) / 100
     ns.RF_RefreshBarTints(b._health)
-    FB.SizeVisuals(b, w, h)
-
-    ApplyFont(b._nameText, s.nameSize or 10)
-    ApplyFont(b._healthText, s.healthTextSize or 9)
-    b._nameText:SetHeight(0)
-    b._healthText:SetHeight(0)
-    local namePos = s.namePosition or "center"
-    if namePos == "none" then
-        b._nameText:Hide()
-    else
-        b._nameText:Show()
-        FB.AnchorText(b._nameText, b._health, namePos, s.nameOffsetX or 0, s.nameOffsetY or 0)
-    end
-    FB.AnchorText(b._healthText, b._health, s.healthTextPosition or "center",
-        s.healthTextOffsetX or 0, s.healthTextOffsetY or 0)
-    if b._healAbsorbText then
-        ApplyFont(b._healAbsorbText, s.healAbsorbTextSize or 9)
-        b._healAbsorbText:SetHeight(0)
-        FB.AnchorText(b._healAbsorbText, b._health, s.healAbsorbTextPosition or "center",
-            s.healAbsorbTextOffsetX or 0, s.healAbsorbTextOffsetY or 0)
-    end
+    FB.SizeVisuals(b, w, h, s)
     FB.StyleBorder(b)
 end
 

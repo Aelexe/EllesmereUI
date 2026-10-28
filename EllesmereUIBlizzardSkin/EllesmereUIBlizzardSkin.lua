@@ -67,6 +67,7 @@ local WINDOW_ENABLE_KEYS = {
     delvepicker     = "reskinDelvePicker",
     playerchoice    = "reskinPlayerChoice",
     trade           = "reskinTrade",
+    flagcarrier     = "reskinFlagCarriers",
 }
 -- WoW Forever's own windows: the bag bar and Progress Legacy skins exist only there.
 if EllesmereUI.IS_FOREVER then
@@ -117,6 +118,7 @@ do
         { marker = "queueChoiceTradeStyleSeeded",
           keys = { "queuestatus", "delvepicker", "playerchoice", "trade" } },
         { marker = "bnetToastStyleSeeded", keys = { "bnettoast" } },
+        { marker = "flagCarrierSkinSeeded", keys = { "flagcarrier" } },
     }
     -- Retail only: this shipment is when the Friends List card started
     -- skinning retail's friends window. WoW Forever's card has driven its own
