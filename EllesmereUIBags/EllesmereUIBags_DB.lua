@@ -53,7 +53,6 @@ local BAGS_DEFAULTS = {
         bagArmoryGroupBySlot  = false,
         bagCompactArmorySlotGroups = false,
         bagHideAddCategory    = false,
-        bagBgOpacity          = 100,     -- Background Opacity, bags and bank (bagBgColor / bagSlotBgColor: nil = default)
         bagWindowLocked       = false,   -- footer lock icon: no resizing or moving
         bankWindowLocked      = false,
         bagOpenWithCharacter  = false,

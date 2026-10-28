@@ -87,31 +87,6 @@ local function PinItemButtonLevel(btn, level)
     if btn._warbankDim then btn._warbankDim:SetFrameLevel(level + 6) end
 end
 
--- Background Color / Opacity, shared by the bags and bank windows: the
--- texture fades with the opacity, the tint over it takes the color
-function ns.ApplyWindowBackground(bg, overlay)
-    if not (bg and overlay) then return end
-    local p = BP()
-    local o = (p.bagBgOpacity or 100) / 100
-    local c = p.bagBgColor
-    bg:SetAlpha(o)
-    overlay:SetColorTexture(c and c.r or 0, c and c.g or 0, c and c.b or 0, c and c.a or 0.25)
-    overlay:SetAlpha(o)
-end
-
--- Slot Background: tint and opacity over an empty slot's backdrop; alpha is
--- that slot's own base opacity
-function ns.PaintSlotBackground(tex, alpha)
-    local c = BP().bagSlotBgColor
-    if c then
-        tex:SetVertexColor(c.r, c.g, c.b)
-        tex:SetAlpha(alpha * (c.a or 1))
-    else
-        tex:SetVertexColor(1, 1, 1)
-        tex:SetAlpha(alpha)
-    end
-end
-
 function ns.PinItemButton(btn, window)
     PinItemButtonLevel(btn, window:GetFrameLevel() + 9)
 end

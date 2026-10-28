@@ -515,7 +515,6 @@ local function FinishRefresh(curY, gridContentW, sidebarW, totalCount, numEmpty,
     end
 
     UpdateBagMoneyDisplay()
-    ns.ApplyWindowBackground(EUI_Bags.bg, EUI_Bags.bgOverlay)
     -- View may have changed under a held item (catch layer on / off)
     if EUI_Bags._syncDropTarget and GetCursorInfo() == "item" then EUI_Bags._syncDropTarget() end
     ns.UpdateResizeGrip(EUI_Bags, EUI_Bags.IsListMode() and _bagListGripCfg or _bagGripCfg)

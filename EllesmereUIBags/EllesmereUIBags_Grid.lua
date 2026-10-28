@@ -197,11 +197,11 @@ local function RenderButton(btn, data, _, col, row, startX, currentY, _, interac
         btn._emptyBg:Show()
         if interactiveEmpties then
             btn:EnableMouse(true)
-            ns.PaintSlotBackground(btn._emptyBg, 0.6)
+            btn._emptyBg:SetAlpha(0.6)
             SetInsetBorderColor(btn, 0.15, 0.15, 0.15, 0.5)
         else
             btn:EnableMouse(false)
-            ns.PaintSlotBackground(btn._emptyBg, 0.35)
+            btn._emptyBg:SetAlpha(0.35)
             SetInsetBorderColor(btn, 0, 0, 0, 0.3)
         end
         -- Reset to 1px and drop the marker, or a pooled slot vacated by a quest item keeps the 2px gold border + atlas.
@@ -544,7 +544,6 @@ function ns.RenderGridView(tempItems, displayItems, emptySlots, child, columns, 
             local col = (totalIdx - 1) % columns
             local row = math.floor((totalIdx - 1) / columns)
             pad:SetPoint("TOPLEFT", startX + (col * (SLOT_SIZE + SPACING)), curY - (row * (SLOT_SIZE + SPACING)))
-            ns.PaintSlotBackground(pad._bg, 0.35)
             pad:Show()
         end
     end
