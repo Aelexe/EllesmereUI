@@ -100,6 +100,14 @@ local function GetFallbackIcon(bagID)
     return icon
 end
 
+ns.BankDefaultsToOne = BankDefaultsToOne  -- the Offline Bank's sidebar orders its views the same way
+
+-- a tab's icon, or the fallback when it has none (the Offline Bank's saved tabs use it too)
+function ns.BankTabIcon(bagID, icon)
+    if icon and icon ~= 134400 then return icon end
+    return bagID and GetFallbackIcon(bagID) or 134400
+end
+
 local CHARACTER_BANK_BAGS = {}
 local WARBAND_BANK_BAGS = {}
 if Enum and Enum.BagIndex then
@@ -171,7 +179,7 @@ local function GetWarbandBankTabs()
                     local name = td.name or EUI.Lf("Tab %1$d", i)
                     local icon = td.icon
                     if not icon or icon == 134400 then icon = GetFallbackIcon(bagID) end
-                    tabs[#tabs + 1] = { bagID = bagID, numSlots = numSlots, name = EUI.L("Warbank") .. " " .. name, icon = icon, depositFlags = td.depositFlags or 0 }
+                    tabs[#tabs + 1] = { bagID = bagID, numSlots = numSlots, name = EUI.L("Warbank") .. " " .. name, shortName = name, icon = icon, depositFlags = td.depositFlags or 0 }
                 end
             end
         end
@@ -3001,15 +3009,30 @@ function BuildBankSidebar()
     -- View indices: 0 = All Bank Tabs, -1 = OneBank, -2 = All Warbank Tabs, -3 = OneWarbank
     -- >0 = individual tab index in _allTabs
 
+    -- Physical tabs can be hidden once the category list is doing the
+    -- navigating, but only when it is actually on -- otherwise the sidebar
+    -- would have nothing left to click.
+    local showTabs = not (BP().bankHideTabsInSidebar and BP().bankCategorySidebar and _catIndex)
+
+    -- each kind's tabs, nested under its All entry
+    local function NestTabs(warband)
+        if not showTabs then return end
+        for ti, tab in ipairs(_allTabs) do
+            if (tab.isWarband == true) == warband then
+                RenderSidebarEntry(ti, tab.shortName or tab.name, tab.icon or (warband and 1542854 or 133652),
+                    tab._usedSlots, selView == ti, 1)
+            end
+        end
+    end
+
     local defaultOneBag = BankDefaultsToOne()
     if not _warbandOnly then
-        if defaultOneBag then
-            RenderSidebarEntry(-1, EllesmereUI.L("OneBank"), 1542860, charUsed, selView == -1)
+        local function All()
             RenderSidebarEntry(0, EllesmereUI.L("All Bank Tabs"), 413587, charUsed, selView == 0)
-        else
-            RenderSidebarEntry(0, EllesmereUI.L("All Bank Tabs"), 413587, charUsed, selView == 0)
-            RenderSidebarEntry(-1, EllesmereUI.L("OneBank"), 1542860, charUsed, selView == -1)
+            NestTabs(false)
         end
+        local function One() RenderSidebarEntry(-1, EllesmereUI.L("OneBank"), 1542860, charUsed, selView == -1) end
+        if defaultOneBag then One(); All() else All(); One() end
     end
 
     -- Warband "All" and "One" entries
@@ -3018,13 +3041,12 @@ function BuildBankSidebar()
         if tab.isWarband then hasWarband = true; break end
     end
     if hasWarband then
-        if defaultOneBag then
-            RenderSidebarEntry(-3, EllesmereUI.L("OneWarbank"), 1542854, warbUsed, selView == -3)
+        local function All()
             RenderSidebarEntry(-2, EllesmereUI.L("All Warbank Tabs"), 1542854, warbUsed, selView == -2)
-        else
-            RenderSidebarEntry(-2, EllesmereUI.L("All Warbank Tabs"), 1542854, warbUsed, selView == -2)
-            RenderSidebarEntry(-3, EllesmereUI.L("OneWarbank"), 1542854, warbUsed, selView == -3)
+            NestTabs(true)
         end
+        local function One() RenderSidebarEntry(-3, EllesmereUI.L("OneWarbank"), 1542854, warbUsed, selView == -3) end
+        if defaultOneBag then One(); All() else All(); One() end
     end
 
     -- Divider
@@ -3130,55 +3152,20 @@ function BuildBankSidebar()
         sidebarChild._catDivider:Hide()
     end
 
-    -- Physical tabs can be hidden once the category list is doing the
-    -- navigating, but only when it is actually on -- otherwise the sidebar
-    -- would have nothing left to click.
-    local showTabs = not (BP().bankHideTabsInSidebar and BP().bankCategorySidebar and _catIndex)
-
-    if not _warbandOnly and showTabs then
-        ShowDivider("_bankTabDivider")
-
-        -- Character bank tabs
-        for ti, tab in ipairs(_allTabs) do
-            if not tab.isWarband then
-                RenderSidebarEntry(ti, tab.name, tab.icon or 133652, tab._usedSlots, selView == ti)
-            end
-        end
-    else
-        if sidebarChild._bankTabDivider then sidebarChild._bankTabDivider:Hide() end
-    end
-
-    -- Purchase character bank tab, outside the tab list: hiding the tabs must not
-    -- remove the only way to buy one. Matches the warband entry below.
-    if not _warbandOnly and C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
+    -- Buy entries, below the lists
+    local canBuyChar = not _warbandOnly and C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
         and C_Bank.CanPurchaseBankTab(Enum.BankType.Character)
-        and not C_Bank.HasMaxBankTabs(Enum.BankType.Character) then
-        if not showTabs then ShowDivider("_bankTabDivider") end
-        RenderPurchaseEntry(Enum.BankType.Character, "Buy Bank Tab")
-    end
-
-    -- Warband individual tabs
-    if hasWarband and showTabs then
-        ShowDivider("_warbandDivider")
-
-        for ti, tab in ipairs(_allTabs) do
-            if tab.isWarband then
-                RenderSidebarEntry(ti, tab.name, tab.icon or 1542854, tab._usedSlots, selView == ti)
-            end
-        end
-    else
-        if sidebarChild._warbandDivider then sidebarChild._warbandDivider:Hide() end
-        if sidebarChild._warbandTabDivider then sidebarChild._warbandTabDivider:Hide() end
-    end
-    -- Purchase warband bank tab
-    if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
+        and not C_Bank.HasMaxBankTabs(Enum.BankType.Character)
+    local canBuyWarband = C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
         and C_Bank.CanPurchaseBankTab(Enum.BankType.Account)
-        and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
-        if not hasWarband then
-            ShowDivider("_warbandDivider")
-        end
-        RenderPurchaseEntry(Enum.BankType.Account, "Buy Warbank Tab")
+        and not C_Bank.HasMaxBankTabs(Enum.BankType.Account)
+    if canBuyChar or canBuyWarband then
+        ShowDivider("_buyDivider")
+    elseif sidebarChild._buyDivider then
+        sidebarChild._buyDivider:Hide()
     end
+    if canBuyChar then RenderPurchaseEntry(Enum.BankType.Character, "Buy Bank Tab") end
+    if canBuyWarband then RenderPurchaseEntry(Enum.BankType.Account, "Buy Warbank Tab") end
 
     -- Set scroll child height so scrolling works when content overflows
     sidebarChild:SetHeight(math.abs(y) + 4)

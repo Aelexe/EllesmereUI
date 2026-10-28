@@ -66,10 +66,14 @@ local moneyN = 0
 
 local function ShownKey(v) return v.key or Offline.CurrentKey() end
 
--- v.viewTab: "bank" | "warband" (all tabs) or "bank:2" | "warband:1" (one tab)
+-- v.viewTab: "bank" | "warband" (all tabs, by category), "onebank" |
+-- "onewarband" (all tabs, one block) or "bank:2" | "warband:1" (one tab)
 local function TabKind(v)
-    local kind, i = v.viewTab:match("^(%a+):?(%d*)$")
-    return kind or "bank", tonumber(i)
+    local key = v.viewTab
+    local one = key:sub(1, 3) == "one"
+    if one then key = key:sub(4) end
+    local kind, i = key:match("^(%a+):?(%d*)$")
+    return kind or "bank", tonumber(i), one
 end
 
 -- drop a pick that no longer resolves (option off, forgotten, source changed)
@@ -533,16 +537,27 @@ Paint = function(v)
     local items, used, total = Collect(list, query, filter)
     local y, shown, nh = -6, 0, 0
     if list then
-        for _, g in ipairs(Group(items)) do
-            nh = nh + 1
-            local h = Head(v, nh)
-            SetFont(h.label, titleSize)
-            h:ClearAllPoints()
-            h:SetPoint("TOPLEFT", PAD + 5, y)
-            h:SetWidth(gridW)
-            h.label:SetText(g.name .. " (" .. #g.items .. ")")
-            h:Show()
-            y = y - 22
+        local groups = Group(items)
+        -- OneBank / OneWarbank: every item in one block, no headers
+        if v.mode == "bank" and select(3, TabKind(v)) then
+            local all = {}
+            for _, g in ipairs(groups) do
+                for _, it in ipairs(g.items) do all[#all + 1] = it end
+            end
+            groups = { { items = all } }
+        end
+        for _, g in ipairs(groups) do
+            if g.name then
+                nh = nh + 1
+                local h = Head(v, nh)
+                SetFont(h.label, titleSize)
+                h:ClearAllPoints()
+                h:SetPoint("TOPLEFT", PAD + 5, y)
+                h:SetWidth(gridW)
+                h.label:SetText(g.name .. " (" .. #g.items .. ")")
+                h:Show()
+                y = y - 22
+            end
             for i, it in ipairs(g.items) do
                 shown = shown + 1
                 local b = Slot(v, shown)
@@ -754,19 +769,28 @@ if EUI_Bank then
         local side = v.side
         local c = Offline.Char(ShownKey(v))
         local entries = {}
-        local function Add(kind, all, allIcon, tabs)
+        -- the live sidebar's layout: All (its tabs nested under it) and One, per kind
+        local oneFirst = ns.BankDefaultsToOne and ns.BankDefaultsToOne()
+        local function Add(kind, all, one, icon, oneIcon, tabs, bagKey)
             local total = 0
             for _, t in ipairs(tabs or {}) do total = total + Used(t) end
-            entries[#entries + 1] = { key = kind, name = all, icon = allIcon, n = total }
-            for i, t in ipairs(tabs or {}) do
-                if type(t) == "table" then
-                    entries[#entries + 1] = { key = kind .. ":" .. i, name = (t.name and t.name ~= "") and t.name or EllesmereUI.Lf("Tab %1$d", i),
-                                              icon = t.icon or allIcon, n = Used(t) }
+            local function All()
+                entries[#entries + 1] = { key = kind, name = all, icon = icon, n = total }
+                if BP().bankHideTabsInSidebar and BP().bankCategorySidebar then return end
+                for i, t in ipairs(tabs or {}) do
+                    if type(t) == "table" then
+                        local bagID = Enum.BagIndex[bagKey .. i]
+                        entries[#entries + 1] = { key = kind .. ":" .. i, nested = true,
+                            name = (t.name and t.name ~= "") and t.name or EllesmereUI.Lf("Tab %1$d", i),
+                            icon = ns.BankTabIcon and ns.BankTabIcon(bagID, t.icon) or t.icon or icon, n = Used(t) }
+                    end
                 end
             end
+            local function One() entries[#entries + 1] = { key = "one" .. kind, name = one, icon = oneIcon, n = total } end
+            if oneFirst then One(); All() else All(); One() end
         end
-        Add("bank", EllesmereUI.L("All Bank Tabs"), 413587, c and c.bank)
-        Add("warband", EllesmereUI.L("All Warbank Tabs"), 1542854, Offline.Warband().tabs)
+        Add("bank", EllesmereUI.L("All Bank Tabs"), EllesmereUI.L("OneBank"), 413587, 1542860, c and c.bank, "CharacterBankTab_")
+        Add("warband", EllesmereUI.L("All Warbank Tabs"), EllesmereUI.L("OneWarbank"), 1542854, 1542854, Offline.Warband().tabs, "AccountBankTab_")
 
         local collapsed = BP().bankSidebarCollapsed
         local w = side:GetWidth()
@@ -777,8 +801,6 @@ if EUI_Bank then
             local row = Row(i)
             row.key, row.name, row.n = e.key, e.name, e.n
             row.on = e.key == v.viewTab
-            -- a gap before the warband entries, like the live sidebar's groups
-            if i > 1 and e.key == "warband" then y = y - 8 end
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", side, "TOPLEFT", 0, y)
             row:SetWidth(w)
@@ -786,7 +808,7 @@ if EUI_Bank then
             if collapsed then
                 row.icon:SetPoint("CENTER")
             else
-                row.icon:SetPoint("LEFT", 8 + (e.key:find(":") and 10 or 0), 0)
+                row.icon:SetPoint("LEFT", 8 + (e.nested and 10 or 0), 0)
             end
             row.icon:SetTexture(EllesmereUI.ClientIcon and EllesmereUI.ClientIcon(e.icon) or e.icon)
             row.icon:SetAlpha(row.on and 1 or 0.75)
