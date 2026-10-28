@@ -2778,6 +2778,180 @@ end
 -------------------------------------------------------------------------------
 --  Sidebar Build
 -------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+--  Category drag-to-reorder: plain categories and group headers move among
+--  themselves, a group's members within that group (joining or leaving a
+--  group stays with the bags sidebar). The order is the bags' own.
+-------------------------------------------------------------------------------
+local _drag  -- { btn, scope, id, startY, live } from the press to the drop
+
+-- a row's place for a drag in `scope` ("top" or "group:<name>"): its block id
+-- and category indices, nil when it isn't part of that scope
+local function DragBlock(btn, scope)
+    local sel = btn._catSel
+    local CM = _G.EUI_CategoryManager
+    if not (sel and CM) or btn._isPurchaseTab then return nil end
+    local cats = CM:GetCategories()
+    local group, i = sel.group, nil
+    if not group then
+        for ci, c in ipairs(cats) do if c._defaultName == sel.key then i = ci; break end end
+        if not i or cats[i].isJunk or cats[i].isEquipSet then return nil end
+        group = cats[i].groupName
+    end
+    if scope == "top" then
+        if group then return "g:" .. group, CM:GetGroupMembers(group) end
+        -- Item Set Gear carries its set categories along
+        local block = { i }
+        if cats[i].isSetGear then
+            for ci, c in ipairs(cats) do if c.isEquipSet then block[#block + 1] = ci end end
+        end
+        return "k:" .. sel.key, block
+    end
+    if i and group and scope == "group:" .. group then return "k:" .. sel.key, { i } end
+end
+
+-- what a press on this row would drag (detail rows and Junk drag nothing)
+local function DragScope(btn)
+    local sel = btn._catSel
+    if not sel or sel.detail then return nil end
+    if sel.group then return "top" end
+    local CM = _G.EUI_CategoryManager
+    for _, c in ipairs(CM and CM:GetCategories() or {}) do
+        if c._defaultName == sel.key then
+            if c.isJunk or c.isEquipSet or c.noMove then return nil end
+            return c.groupName and ("group:" .. c.groupName) or "top"
+        end
+    end
+end
+
+local dragFrame = CreateFrame("Frame")
+dragFrame:Hide()
+local dragGhost, dragLine
+
+local function DragVisuals(btn)
+    if not dragGhost then
+        dragGhost = CreateFrame("Frame", nil, UIParent)
+        dragGhost:SetFrameStrata("TOOLTIP")
+        dragGhost:SetSize(150, SIDEBAR_BTN_H)
+        dragGhost:SetAlpha(0.7)
+        local bg = dragGhost:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetColorTexture(0, 0, 0, 0.6)
+        dragGhost._icon = dragGhost:CreateTexture(nil, "ARTWORK")
+        dragGhost._icon:SetSize(SIDEBAR_ICON_SIZE, SIDEBAR_ICON_SIZE)
+        dragGhost._icon:SetPoint("LEFT", 6, 0)
+        dragGhost._label = dragGhost:CreateFontString(nil, "OVERLAY")
+        SetBankFont(dragGhost._label, 11)
+        dragGhost._label:SetPoint("LEFT", dragGhost._icon, "RIGHT", 6, 0)
+        dragLine = sidebarChild:CreateTexture(nil, "OVERLAY")
+        dragLine:SetHeight(2)
+    end
+    dragGhost._icon:SetTexture(btn._icon:GetTexture())
+    dragGhost._icon:SetTexCoord(btn._icon:GetTexCoord())
+    dragGhost._label:SetText(btn._entryName or "")
+    dragGhost:SetWidth(math.max(dragGhost._label:GetStringWidth() + SIDEBAR_ICON_SIZE + 24, 80))
+    local r, g, b = GetAccentRGB()
+    dragLine:SetColorTexture(r, g, b, 1)
+end
+
+-- the drop spot under the cursor: the target block and before/after it
+local function DragTarget()
+    local over
+    for _, b in pairs(_sidebarBtns) do
+        if b:IsShown() and b:IsMouseOver() then over = b; break end
+    end
+    if not over then return nil end
+    local id, block = DragBlock(over, _drag.scope)
+    if not id or id == _drag.id then return nil end
+    -- the whole block's rows (a group's header, members and details)
+    local top, bottom
+    for _, b in pairs(_sidebarBtns) do
+        if b:IsShown() and DragBlock(b, _drag.scope) == id then
+            if not top or b:GetTop() > top:GetTop() then top = b end
+            if not bottom or b:GetBottom() < bottom:GetBottom() then bottom = b end
+        end
+    end
+    local _, cy = GetCursorPosition()
+    cy = cy / sidebarChild:GetEffectiveScale()
+    local after = cy < (top:GetTop() + bottom:GetBottom()) / 2
+    return block, after, after and bottom or top
+end
+
+local function FinishDrag(apply)
+    local d = _drag
+    _drag = nil
+    dragFrame:Hide()
+    if dragGhost then dragGhost:Hide(); dragLine:Hide() end
+    if not (d and d.live) then return end
+    d.btn:SetAlpha(1)
+    local target = apply and d.target
+    if not target then return end
+    local CM = _G.EUI_CategoryManager
+    local cats = CM:GetCategories()
+    local _, moving = DragBlock(d.btn, d.scope)
+    if not moving then return end
+    table.sort(moving)
+    local insertAt = d.after and (math.max(unpack(target)) + 1) or math.min(unpack(target))
+    if insertAt >= moving[1] and insertAt <= moving[#moving] + 1 then return end
+    -- the bags keep their selection by category, not by index
+    local selIdx, selGroup = ns.GetSelection and ns.GetSelection()
+    local selCat = selIdx and selIdx > 0 and cats[selIdx]
+    local entries = {}
+    for k = #moving, 1, -1 do
+        if moving[k] < insertAt then insertAt = insertAt - 1 end
+        table.insert(entries, 1, table.remove(cats, moving[k]))
+    end
+    -- Junk stays last
+    if cats[#cats] and cats[#cats].isJunk and insertAt > #cats then insertAt = #cats end
+    for k, c in ipairs(entries) do table.insert(cats, insertAt + k - 1, c) end
+    CM:SaveState()
+    if selCat and ns.SetSelection then
+        for ci, c in ipairs(cats) do if c == selCat then ns.SetSelection(ci, selGroup); break end end
+    end
+    EUI_Bank:RefreshBank()
+    if _G.EUI_Bags and _G.EUI_Bags:IsVisible() and _G.EUI_Bags.RefreshInventory then _G.EUI_Bags:RefreshInventory() end
+end
+
+dragFrame:SetScript("OnUpdate", function()
+    local d = _drag
+    if not d then dragFrame:Hide(); return end
+    local x, y = GetCursorPosition()
+    if not IsMouseButtonDown("LeftButton") then FinishDrag(true); return end
+    if not d.live then
+        -- a press becomes a drag after a few pixels
+        if math.abs(y - d.startY) <= 4 then return end
+        d.live = true
+        d.btn._didDrag = true
+        d.btn:SetAlpha(0.4)
+        DragVisuals(d.btn)
+        dragGhost:Show()
+    end
+    local sc = UIParent:GetEffectiveScale()
+    dragGhost:ClearAllPoints()
+    dragGhost:SetPoint("LEFT", UIParent, "BOTTOMLEFT", x / sc + 12, y / sc)
+    local block, after, row = DragTarget()
+    d.target, d.after = block, after
+    if row then
+        dragLine:ClearAllPoints()
+        local inset = math.floor(sidebarChild:GetWidth() * 0.05)
+        local edge = after and "BOTTOM" or "TOP"
+        dragLine:SetPoint("LEFT", row, edge .. "LEFT", inset, 0)
+        dragLine:SetPoint("RIGHT", row, edge .. "RIGHT", -inset, 0)
+        dragLine:Show()
+    else
+        dragLine:Hide()
+    end
+end)
+
+local function BeginDrag(btn)
+    local scope = DragScope(btn)
+    if not scope then return end
+    local _, y = GetCursorPosition()
+    _drag = { btn = btn, scope = scope, id = DragBlock(btn, scope), startY = y }
+    dragFrame:Show()
+end
+-- (the bank closing mid-drag hides every row: the release then drops nowhere)
+
 function BuildBankSidebar()
     local collapsed = BP().bankSidebarCollapsed
     local sidebarW = GetBankSidebarWidth()
@@ -2834,8 +3008,13 @@ function BuildBankSidebar()
             EUI.HideWidgetTooltip()
         end)
         btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        btn:SetScript("OnMouseDown", function(self, button)
+            if button == "LeftButton" and not self._isPurchaseTab then BeginDrag(self) end
+        end)
         btn:SetScript("OnClick", function(self, button)
             if self._isPurchaseTab then return end
+            -- the release that ends a drag isn't a click
+            if self._didDrag then self._didDrag = false; return end
 
             if button == "RightButton" and self._viewIdx and self._viewIdx > 0 then
                 local tabData = _allTabs[self._viewIdx]

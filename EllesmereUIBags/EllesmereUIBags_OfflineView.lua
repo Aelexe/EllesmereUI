@@ -59,8 +59,17 @@ end
 --  Views: one per window. v.key is another character picked in its title
 --  (nil = this one); v.mode is what the panel shows ("bags" | "bank" | nil).
 -------------------------------------------------------------------------------
-local bagsView = { win = EUI_Bags, word = "%1$s's Inventory", plain = "Inventory", viewTab = "bank", slots = {}, heads = {}, tabs = {} }
-local bankView = { win = _G.EUI_BankFrame, word = "%1$s's Bank", plain = "Bank", viewTab = "bank", slots = {}, heads = {}, tabs = {} }
+-- the title's words, per window (functions: read in the current locale)
+local bagsView = { win = EUI_Bags, viewTab = "bank", slots = {}, heads = {}, tabs = {},
+    plain = function() return EllesmereUI.L("Inventory") end,
+    alt = function() return EllesmereUI.L("Alt's Inventory") end,
+    back = function() return EllesmereUI.L("Back to your inventory") end,
+    word = function(name) return EllesmereUI.Lf("%1$s's Inventory", name) end }
+local bankView = { win = _G.EUI_BankFrame, viewTab = "bank", slots = {}, heads = {}, tabs = {},
+    plain = function() return EllesmereUI.L("Bank") end,
+    alt = function() return EllesmereUI.L("Alt's Bank") end,
+    back = function() return EllesmereUI.L("Back to your bank") end,
+    word = function(name) return EllesmereUI.Lf("%1$s's Bank", name) end }
 local views = { bagsView, bankView }
 local moneyN = 0
 
@@ -113,72 +122,131 @@ local function Rebuild(v)
 end
 
 -------------------------------------------------------------------------------
---  The title: "Name's Inventory" / "Name's Bank", a dropdown of saved characters
+--  The title: "Inventory | Alt's Inventory" (the bank: "Bank | Alt's Bank").
+--  The second part drops down the other saved characters; once one shows it
+--  reads "Name's Inventory", and the first part leads back.
 -------------------------------------------------------------------------------
--- realms as titles, characters as radios, forget at the end
+-- realms as headers (more than one realm only), then the forget entry
 local function OpenPicker(v, owner)
-    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
-        local realm
-        for _, c in ipairs(Offline.Characters()) do
-            if c.realm ~= realm then
-                realm = c.realm
-                root:CreateTitle(realm)
-            end
-            root:CreateRadio(Hex(c.class) .. c.name .. "|r", function() return ShownKey(v) == c.key end, function()
-                v.key = not c.current and c.key or nil
-                Rebuild(v)
-            end)
+    if not EUI.ShowContextMenu then return end
+    local items, realm = {}, nil
+    local chars, realms = {}, {}
+    for _, c in ipairs(Offline.Characters()) do
+        if not c.current then
+            chars[#chars + 1] = c
+            realms[c.realm] = true
         end
-        local c = v.key and Offline.Char(v.key)
-        if c and Offline.CanForget(v.key) then
-            root:CreateDivider()
-            root:CreateButton(EllesmereUI.Lf("Forget %1$s", c.name or v.key), function()
-                Offline.Forget(v.key)
-                v.key = nil
-                Rebuild(v)
-            end)
+    end
+    local manyRealms = next(realms) ~= nil and next(realms, next(realms)) ~= nil
+    local function Off() return true end
+    for _, c in ipairs(chars) do
+        if manyRealms and c.realm ~= realm then
+            realm = c.realm
+            items[#items + 1] = { text = realm, noLoc = true, isDisabled = Off }
         end
-    end)
+        items[#items + 1] = { text = Hex(c.class) .. c.name .. "|r", noLoc = true, isActive = v.key == c.key,
+            onClick = function()
+                v.key = c.key
+                Rebuild(v)
+            end }
+    end
+    if #chars == 0 then
+        items[#items + 1] = { text = EllesmereUI.L("No other characters saved yet."), noLoc = true, isDisabled = Off }
+    end
+    local c = v.key and Offline.Char(v.key)
+    if c and Offline.CanForget(v.key) then
+        items[#items + 1] = "---"
+        items[#items + 1] = { text = EllesmereUI.Lf("Forget %1$s", c.name or v.key), noLoc = true, onClick = function()
+            Offline.Forget(v.key)
+            v.key = nil
+            Rebuild(v)
+        end }
+    end
+    EUI.ShowContextMenu(owner, items, { below = true, fontKey = "bags", minWidth = owner:GetWidth() })
 end
 
 -- title: the window's title FontString; count: the item count beside it
 local function SyncTitle(v, title, count)
     if not (title and count) then return end
     local on = Offline.Enabled()
-    if on and not v.titleBtn then
-        local b = CreateFrame("Button", nil, title:GetParent())
-        b:SetPoint("TOPLEFT", title, "TOPLEFT", -4, 4)
-        b:SetPoint("BOTTOMLEFT", title, "BOTTOMLEFT", -4, -4)
+    if on and not v.pick then
+        local hdr = title:GetParent()
+        local sep = hdr:CreateFontString(nil, "OVERLAY")
+        sep:SetPoint("LEFT", title, "RIGHT", 6, 0)
+        sep:SetText("|")
+        sep:SetTextColor(0.4, 0.4, 0.4)
+
+        local b = CreateFrame("Button", nil, hdr)
+        b:SetPoint("LEFT", sep, "RIGHT", 2, 0)
+        b.text = b:CreateFontString(nil, "OVERLAY")
+        b.text:SetPoint("LEFT", 4, 0)
         b.arrow = b:CreateTexture(nil, "OVERLAY")
         b.arrow:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-arrow-down3.png")
         b.arrow:SetSize(10, 10)
-        b.arrow:SetPoint("LEFT", title, "RIGHT", 5, 0)
-        b.arrow:SetAlpha(0.7)
+        b.arrow:SetPoint("LEFT", b.text, "RIGHT", 5, 0)
         b:SetScript("OnClick", function(self) OpenPicker(v, self) end)
         b:SetScript("OnEnter", function(self)
             self.arrow:SetAlpha(1)
-            EUI.ShowWidgetTooltip(self, EllesmereUI.L("Choose a character"))
+            if not v.key then self.text:SetTextColor(1, 1, 1) end
         end)
         b:SetScript("OnLeave", function(self)
             self.arrow:SetAlpha(0.7)
+            if not v.key then self.text:SetTextColor(0.7, 0.7, 0.7) end
+        end)
+
+        -- the plain title leads back while another character shows
+        local back = CreateFrame("Button", nil, hdr)
+        back:SetPoint("TOPLEFT", title, "TOPLEFT", -4, 4)
+        back:SetPoint("BOTTOMRIGHT", title, "BOTTOMRIGHT", 4, -4)
+        back:SetScript("OnClick", function()
+            if not v.key then return end
+            v.key = nil
+            Rebuild(v)
+        end)
+        back:SetScript("OnEnter", function(self)
+            if not v.key then return end
+            title:SetTextColor(1, 1, 1)
+            EUI.ShowWidgetTooltip(self, v.back())
+        end)
+        back:SetScript("OnLeave", function()
+            if v.key then title:SetTextColor(0.5, 0.5, 0.5) end
             EUI.HideWidgetTooltip()
         end)
-        v.titleBtn = b
+        v.pick = { sep = sep, btn = b, back = back }
     end
-    if v.titleBtn then v.titleBtn:SetShown(on) end
+    title:SetText(v.plain())
     count:ClearAllPoints()
-    if on then
-        local c = Offline.Char(ShownKey(v))
-        local name = (c and c.name) or UnitName("player") or ""
-        local class = (c and c.class) or select(2, UnitClass("player"))
-        title:SetText(EllesmereUI.Lf(v.word, Hex(class) .. name .. "|r"))
-        v.titleBtn:SetWidth(title:GetStringWidth() + 23)
-        count:SetPoint("LEFT", v.titleBtn.arrow, "RIGHT", 8, 0)
-    else
-        title:SetText(EllesmereUI.L(v.plain))
-        count:SetPoint("LEFT", title, "RIGHT", 8, 0)
+    local p = v.pick
+    if p then
+        p.sep:SetShown(on)
+        p.btn:SetShown(on)
+        p.back:SetShown(on)
     end
+    if not on then
+        title:SetTextColor(1, 1, 1)
+        count:SetPoint("LEFT", title, "RIGHT", 8, 0)
+        return
+    end
+    -- the same font as the title, which follows the font settings
+    local font, size, flags = title:GetFont()
+    if font then
+        p.sep:SetFont(font, size, flags)
+        p.btn.text:SetFont(font, size, flags)
+    end
+    local alt = AltKey(v)
+    local c = alt and Offline.Char(alt)
+    if c then
+        title:SetTextColor(0.5, 0.5, 0.5)
+        p.btn.text:SetText(v.word(Hex(c.class) .. (c.name or alt) .. "|r"))
+        p.btn.text:SetTextColor(1, 1, 1)
+    else
+        title:SetTextColor(1, 1, 1)
+        p.btn.text:SetText(v.alt())
+        p.btn.text:SetTextColor(0.7, 0.7, 0.7)
+    end
+    p.btn.arrow:SetAlpha(0.7)
+    p.btn:SetSize(p.btn.text:GetStringWidth() + 23, (p.btn.text:GetStringHeight() or 12) + 8)
+    count:SetPoint("LEFT", p.btn.arrow, "RIGHT", 8, 0)
 end
 
 -- closing a window goes back to this character
