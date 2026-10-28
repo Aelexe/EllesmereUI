@@ -119,7 +119,7 @@ end
 
 -------------------------------------------------------------------------------
 --  The title: "Name's Inventory" (the bank: "Name's Bank") for whoever shows,
---  then "|" and a dropdown button listing the saved characters.
+--  then a dropdown button listing the saved characters.
 -------------------------------------------------------------------------------
 -- realms as headers (more than one realm only), then the forget entry
 local function OpenPicker(v, owner)
@@ -162,24 +162,17 @@ local function SyncTitle(v, title, count)
     local on = Offline.Enabled()
     if on and not v.pick then
         local hdr = title:GetParent()
-        -- a font before any text: SetText on a font string without one throws
-        local sep = hdr:CreateFontString(nil, "OVERLAY")
-        SetFont(sep, 13)
-        sep:SetPoint("LEFT", title, "RIGHT", 6, 0)
-        sep:SetText("|")
-        sep:SetTextColor(0.4, 0.4, 0.4)
-
-        -- a small square button holding the arrow
+        -- a small square button holding the person icon
         local b = CreateFrame("Button", nil, hdr)
         b:SetSize(20, 20)
-        b:SetPoint("LEFT", sep, "RIGHT", 6, 0)
+        b:SetPoint("LEFT", title, "RIGHT", 8, 0)
         b.bg = b:CreateTexture(nil, "BACKGROUND")
         b.bg:SetAllPoints()
         b.bg:SetColorTexture(1, 1, 1, 0.06)
         if EUI.MakeBorder then EUI.MakeBorder(b, 1, 1, 1, 0.15, EUI.PP) end
         b.arrow = b:CreateTexture(nil, "OVERLAY")
-        b.arrow:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-arrow-down3.png")
-        b.arrow:SetSize(10, 10)
+        b.arrow:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-person.png")
+        b.arrow:SetSize(14, 14)
         b.arrow:SetPoint("CENTER")
         b.arrow:SetAlpha(0.8)
         b:SetScript("OnClick", function(self) OpenPicker(v, self) end)
@@ -193,21 +186,16 @@ local function SyncTitle(v, title, count)
             self.bg:SetColorTexture(1, 1, 1, 0.06)
             EUI.HideWidgetTooltip()
         end)
-        v.pick = { sep = sep, btn = b }
+        v.pick = { btn = b }
     end
     count:ClearAllPoints()
     local p = v.pick
-    if p then
-        p.sep:SetShown(on)
-        p.btn:SetShown(on)
-    end
+    if p then p.btn:SetShown(on) end
     if not on then
         title:SetText(v.plain())
         count:SetPoint("LEFT", title, "RIGHT", 8, 0)
         return
     end
-    local font, size, flags = title:GetFont()
-    if font then p.sep:SetFont(font, size, flags) end
     local c = Offline.Char(ShownKey(v))
     local name = (c and c.name) or UnitName("player") or ""
     local class = (c and c.class) or select(2, UnitClass("player"))
