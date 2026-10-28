@@ -100,9 +100,9 @@ local function GetFallbackIcon(bagID)
     return icon
 end
 
-ns.BankDefaultsToOne = BankDefaultsToOne  -- the Offline Bank's sidebar orders its views the same way
+ns.BankDefaultsToOne = BankDefaultsToOne  -- the offline view orders its sidebar the same way
 
--- a tab's icon, or the fallback when it has none (the Offline Bank's saved tabs use it too)
+-- a tab's icon, or a fallback if it has none (saved tabs use it too)
 function ns.BankTabIcon(bagID, icon)
     if icon and icon ~= 134400 then return icon end
     return bagID and GetFallbackIcon(bagID) or 134400
@@ -233,7 +233,7 @@ SetBankFont(title, 13)
 title:SetPoint("LEFT", header, "LEFT", 8, 0)
 title:SetTextColor(1, 1, 1)
 title:SetText(EllesmereUI.L("Bank"))
-EUI_Bank._headerTitle = title  -- the Offline Bank character picker (EllesmereUIBags_OfflineView.lua)
+EUI_Bank._headerTitle = title  -- the alt button sits next to this
 
 local itemCount = header:CreateFontString(nil, "OVERLAY")
 SetBankFont(itemCount, 11)
@@ -1103,7 +1103,7 @@ end)
 
 -- Sidebar scroll frame (below header, fills rest of sidebar)
 local sidebarSF = CreateFrame("ScrollFrame", nil, sidebar)
-EUI_Bank._sidebarSF = sidebarSF  -- the Offline Bank lists another character's tabs over it
+EUI_Bank._sidebarSF = sidebarSF  -- an alt's tabs get drawn over this
 sidebarSF:SetPoint("TOPLEFT", sidebarHdr, "BOTTOMLEFT", 0, 0)
 sidebarSF:SetSize(GetBankSidebarWidth(), GetBankHeight() - HEADER_H - FOOTER_H - SIDEBAR_HDR_H)
 sidebarSF:EnableMouseWheel(true)
@@ -2779,14 +2779,12 @@ end
 --  Sidebar Build
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
---  Category drag-to-reorder: plain categories and group headers move among
---  themselves, a group's members within that group (joining or leaving a
---  group stays with the bags sidebar). The order is the bags' own.
+--  drag to reorder categories: top-level rows move among themselves, group
+--  members only inside their group. same order the bags use.
 -------------------------------------------------------------------------------
-local _drag  -- { btn, scope, id, startY, live } from the press to the drop
+local _drag  -- { btn, scope, id, startY, live } while a drag is going
 
--- a row's place for a drag in `scope` ("top" or "group:<name>"): its block id
--- and category indices, nil when it isn't part of that scope
+-- a row's block id + category indices in this scope ("top" or "group:<name>"), nil if it's not in it
 local function DragBlock(btn, scope)
     local sel = btn._catSel
     local CM = _G.EUI_CategoryManager
@@ -2800,7 +2798,7 @@ local function DragBlock(btn, scope)
     end
     if scope == "top" then
         if group then return "g:" .. group, CM:GetGroupMembers(group) end
-        -- Item Set Gear carries its set categories along
+        -- item set gear drags its set categories with it
         local block = { i }
         if cats[i].isSetGear then
             for ci, c in ipairs(cats) do if c.isEquipSet then block[#block + 1] = ci end end
@@ -2810,7 +2808,7 @@ local function DragBlock(btn, scope)
     if i and group and scope == "group:" .. group then return "k:" .. sel.key, { i } end
 end
 
--- what a press on this row would drag (detail rows and Junk drag nothing)
+-- what pressing this row would drag (detail rows and junk don't move)
 local function DragScope(btn)
     local sel = btn._catSel
     if not sel or sel.detail then return nil end
@@ -2854,7 +2852,7 @@ local function DragVisuals(btn)
     dragLine:SetColorTexture(r, g, b, 1)
 end
 
--- the drop spot under the cursor: the target block and before/after it
+-- where the drop lands: the block under the cursor, before or after it
 local function DragTarget()
     local over
     for _, b in pairs(_sidebarBtns) do
@@ -2863,7 +2861,7 @@ local function DragTarget()
     if not over then return nil end
     local id, block = DragBlock(over, _drag.scope)
     if not id or id == _drag.id then return nil end
-    -- the whole block's rows (a group's header, members and details)
+    -- all of the block's rows (a group's header, members, details)
     local top, bottom
     for _, b in pairs(_sidebarBtns) do
         if b:IsShown() and DragBlock(b, _drag.scope) == id then
@@ -2893,7 +2891,7 @@ local function FinishDrag(apply)
     table.sort(moving)
     local insertAt = d.after and (math.max(unpack(target)) + 1) or math.min(unpack(target))
     if insertAt >= moving[1] and insertAt <= moving[#moving] + 1 then return end
-    -- the bags keep their selection by category, not by index
+    -- keep the bags' selection on the same category, not the same index
     local selIdx, selGroup = ns.GetSelection and ns.GetSelection()
     local selCat = selIdx and selIdx > 0 and cats[selIdx]
     local entries = {}
@@ -2901,7 +2899,7 @@ local function FinishDrag(apply)
         if moving[k] < insertAt then insertAt = insertAt - 1 end
         table.insert(entries, 1, table.remove(cats, moving[k]))
     end
-    -- Junk stays last
+    -- junk stays at the bottom
     if cats[#cats] and cats[#cats].isJunk and insertAt > #cats then insertAt = #cats end
     for k, c in ipairs(entries) do table.insert(cats, insertAt + k - 1, c) end
     CM:SaveState()
@@ -2918,7 +2916,7 @@ dragFrame:SetScript("OnUpdate", function()
     local x, y = GetCursorPosition()
     if not IsMouseButtonDown("LeftButton") then FinishDrag(true); return end
     if not d.live then
-        -- a press becomes a drag after a few pixels
+        -- only counts as a drag after a few pixels
         if math.abs(y - d.startY) <= 4 then return end
         d.live = true
         d.btn._didDrag = true
@@ -2950,7 +2948,7 @@ local function BeginDrag(btn)
     _drag = { btn = btn, scope = scope, id = DragBlock(btn, scope), startY = y }
     dragFrame:Show()
 end
--- (the bank closing mid-drag hides every row: the release then drops nowhere)
+-- closing the bank mid-drag hides the rows, so the drop just goes nowhere
 
 function BuildBankSidebar()
     local collapsed = BP().bankSidebarCollapsed
@@ -3013,7 +3011,7 @@ function BuildBankSidebar()
         end)
         btn:SetScript("OnClick", function(self, button)
             if self._isPurchaseTab then return end
-            -- the release that ends a drag isn't a click
+            -- letting go of a drag isn't a click
             if self._didDrag then self._didDrag = false; return end
 
             if button == "RightButton" and self._viewIdx and self._viewIdx > 0 then
@@ -3213,7 +3211,7 @@ function BuildBankSidebar()
     -- would have nothing left to click.
     local showTabs = not (BP().bankHideTabsInSidebar and BP().bankCategorySidebar and _catIndex)
 
-    -- each kind's tabs, nested under its All entry
+    -- tabs nested under their all entry
     local function NestTabs(warband)
         if not showTabs then return end
         for ti, tab in ipairs(_allTabs) do
@@ -3241,7 +3239,7 @@ function BuildBankSidebar()
     end
     if sidebarChild._warbandViewDivider then sidebarChild._warbandViewDivider:Hide() end
     if hasWarband then
-        -- the bank's views and the warbank's, apart
+        -- keeps the bank and warbank views apart
         if not _warbandOnly then ShowDivider("_warbandViewDivider") end
         local function All()
             RenderSidebarEntry(-2, EllesmereUI.L("All Warbank Tabs"), 1542854, warbUsed, selView == -2)
@@ -3334,7 +3332,7 @@ function BuildBankSidebar()
         sidebarChild._catDivider:Hide()
     end
 
-    -- Buy entries, below the lists
+    -- buy entries go at the bottom
     local canBuyChar = not _warbandOnly and C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
         and C_Bank.CanPurchaseBankTab(Enum.BankType.Character)
         and not C_Bank.HasMaxBankTabs(Enum.BankType.Character)

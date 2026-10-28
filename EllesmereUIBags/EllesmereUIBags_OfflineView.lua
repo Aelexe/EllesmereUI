@@ -1,37 +1,32 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  EllesmereUIBags_OfflineView.lua
---  Offline Bank views (data from EllesmereUIBags_Offline.lua):
---    * bags: the title reads "Name's Inventory" and drops down a list of
---      saved characters; picking another one shows their bags, and the
---      sidebar categories count and filter their items. Bank in the bags
---      sidebar (the selection -3, EUI_Bags_Sidebar.lua) shows the picked
---      character's bank, or the warband bank.
---    * bank window: the title reads "Name's Bank" with the same list;
---      picking another character shows their saved bank over the live one,
---      their tabs listed in place of the live sidebar's.
+--  offline bank views (data from EllesmereUIBags_Offline.lua):
+--    * bags: an alt button, then "Name's Inventory". picking an alt shows
+--      their bags and the sidebar counts/filters their stuff. bank in the
+--      bags sidebar (selection -3) shows their bank or the warbank.
+--    * bank window: same button and "Name's Bank". an alt's bank shows over
+--      the live one, with their tabs over the live sidebar.
 --
---  Each view is a see-through panel over its window's item area, which fades
---  out underneath (alpha only: the secure item buttons stay put; bags: FinishRefresh in
---  EUI_Bags_Refresh.lua calls ns.OfflinePanel after every refresh and paints
---  no items under it; bank: after EUI_Bank:RefreshBank). Its item buttons are
---  plain display buttons: they never touch a real bag slot, so the views are
---  safe at any time, combat included. Hover for the item tooltip; Shift-click
---  links, Ctrl-click previews (HandleModifiedItemClick). The window's search
---  box filters it too.
+--  each view is a see-through panel over the window's items, which just fade
+--  out underneath (alpha only, the secure buttons never move). the bags call
+--  ns.OfflinePanel after every refresh, the bank hooks RefreshBank. our item
+--  buttons are display only and never touch a real slot, so it's all safe in
+--  combat. hover for tooltips, shift-click links, ctrl-click previews, and the
+--  window's search filters it too.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
 local ns = select(2, ...)
 local Offline = ns.Offline
 local I = ns._bagsInternals
-if not (Offline and I) then return end  -- WoW Forever, or a bags file failed to load
+if not (Offline and I) then return end  -- wow forever, or a bags file didn't load
 
 local GetItemInfo, GetItemInfoInstant = C_Item.GetItemInfo, C_Item.GetItemInfoInstant
 local _emptyP = {}
 local function BP() return (EUI._bagsDB and EUI._bagsDB.profile) or _emptyP end
 
 local SLOT_SIZE, SPACING = 34, 4
-local BAR_H, PAD = 24, 10  -- the bar matches the sidebar header (ns.CreateSidebarHeader)
+local BAR_H, PAD = 24, 10  -- same height as the sidebar header
 local ITEM_CLASS_WEAPON, ITEM_CLASS_ARMOR = Enum.ItemClass.Weapon, Enum.ItemClass.Armor
 local BANK_VIEW = -3
 ns.OFFLINE_BANK_VIEW = BANK_VIEW
@@ -47,7 +42,7 @@ local function Hex(class)
     return c and c:GenerateHexColorMarkup() or "|cffffffff"
 end
 
--- "3 days ago" style age of a saved copy
+-- how old a save is, "3 days ago" style
 local function Age(t)
     if type(t) ~= "number" then return nil end
     local s = math.max(time() - t, 0)
@@ -56,10 +51,10 @@ local function Age(t)
 end
 
 -------------------------------------------------------------------------------
---  Views: one per window. v.key is another character picked in its title
---  (nil = this one); v.mode is what the panel shows ("bags" | "bank" | nil).
+--  views: one per window. v.key is the picked alt (nil = this character),
+--  v.mode is what the panel shows ("bags" | "bank" | nil).
 -------------------------------------------------------------------------------
--- the title's words, per window (functions: read in the current locale)
+-- title text per window (functions so they read the current locale)
 local bagsView = { win = EUI_Bags, viewTab = "bank", slots = {}, heads = {}, tabs = {},
     plain = function() return EllesmereUI.L("Inventory") end,
     word = function(name) return EllesmereUI.Lf("%1$s's Inventory", name) end }
@@ -81,7 +76,7 @@ local function TabKind(v)
     return kind or "bank", tonumber(i), one
 end
 
--- drop a pick that no longer resolves (option off, forgotten, source changed)
+-- drop a pick that doesn't resolve anymore (option off, forgotten, source changed)
 local function AltKey(v)
     if not v.key then return nil end
     if not Offline.Enabled() or v.key == Offline.CurrentKey() or not Offline.Char(v.key) then
@@ -91,7 +86,7 @@ local function AltKey(v)
     return v.key
 end
 
--- another character's bags are showing in the bags (nil while it's this character)
+-- the alt whose bags are showing (nil if it's this character)
 function ns.OfflineAlt() return AltKey(bagsView) end
 
 -- the window's search, lower-cased ("" when empty)
@@ -107,7 +102,7 @@ local function Repaint(v)
     Paint(v)
 end
 
--- the window rebuilds around a new pick
+-- rebuild the window around a new pick
 local function Rebuild(v)
     if v.scroll then v.scroll:SetVerticalScroll(0) end
     if v == bagsView then
@@ -118,10 +113,10 @@ local function Rebuild(v)
 end
 
 -------------------------------------------------------------------------------
---  The title: "Name's Inventory" (the bank: "Name's Bank") for whoever shows,
---  then a dropdown button listing the saved characters.
+--  the title: an alt button, then "Name's Inventory" (or "Name's Bank") for
+--  whoever's showing.
 -------------------------------------------------------------------------------
--- realms as headers (more than one realm only), then the forget entry
+-- realm headers (only with more than one realm), then forget
 local function OpenPicker(v, owner)
     if not EUI.ShowContextMenu then return end
     local items, realm = {}, nil
@@ -156,13 +151,13 @@ local function OpenPicker(v, owner)
     EUI.ShowContextMenu(owner, items, { below = true, fontKey = "bags" })
 end
 
--- title: the window's title FontString; count: the item count beside it
+-- title: the window's title font string, count: the item count next to it
 local function SyncTitle(v, title, count)
     if not (title and count) then return end
     local on = Offline.Enabled()
     if on and not v.pick then
         local hdr = title:GetParent()
-        -- a small square button holding the person icon
+        -- small square button with the person icon
         local b = CreateFrame("Button", nil, hdr)
         b:SetSize(20, 20)
         b.bg = b:CreateTexture(nil, "BACKGROUND")
@@ -189,8 +184,7 @@ local function SyncTitle(v, title, count)
     end
     count:ClearAllPoints()
     local p = v.pick
-    -- the title's own spot (the bags move it for the sidebar arrow); the
-    -- button takes it and the title follows the button
+    -- the button takes the title's spot (bags shift it for the sidebar arrow), the title goes after
     local pt, rel, relPt, x, y = title:GetPoint(1)
     if p and rel ~= p.btn then p.base = { pt, rel, relPt, x, y } end
     if p then p.btn:SetShown(on) end
@@ -218,7 +212,7 @@ end
 EUI_Bags:HookScript("OnHide", function() bagsView.key = nil end)
 
 -------------------------------------------------------------------------------
---  The panel: a bar (Bank / Warband, saved time, gold) over a scrolling grid
+--  the panel: a bar (bank/warband, saved time, gold) over a scrolling grid
 -------------------------------------------------------------------------------
 local function TabButton(v, text, key)
     local b = CreateFrame("Button", nil, v.bar)
@@ -286,7 +280,7 @@ local function Build(v)
         prev = t
     end
 
-    -- gold the way the bags footer shows it (SmallMoneyFrameTemplate, 11pt)
+    -- gold looks like the bags footer's (SmallMoneyFrameTemplate, 11pt)
     moneyN = moneyN + 1
     local name = "EUI_OfflineMoneyFrame" .. moneyN
     local money = CreateFrame("Frame", name, bar, "SmallMoneyFrameTemplate")
@@ -331,7 +325,7 @@ local function Build(v)
 end
 
 -------------------------------------------------------------------------------
---  Item buttons (display only)
+--  item buttons (display only)
 -------------------------------------------------------------------------------
 local function SlotOnEnter(self)
     if not self.link then return end
@@ -389,7 +383,7 @@ local function Head(v, i)
 end
 
 -------------------------------------------------------------------------------
---  Content
+--  content
 -------------------------------------------------------------------------------
 -- the containers behind the view, and when they were saved
 local function Containers(v)
@@ -428,7 +422,7 @@ local function Classify(link, id, q)
     return idx
 end
 
--- the saved items as display entries; only the categories in filter when given
+-- saved items as display entries, only the filter's categories if there is one
 local function Collect(list, query, filter)
     local items, used, total = {}, 0, 0
     for _, t in ipairs(type(list) == "table" and list or {}) do
@@ -460,7 +454,7 @@ local function Collect(list, query, filter)
     return items, used, total
 end
 
--- the sidebar's counts for the picked character's bags (EUI_Bags_Refresh.lua)
+-- sidebar counts for the alt's bags
 function ns.OfflineCounts()
     local c = Offline.Char(bagsView.key)
     local counts, total = {}, 0
@@ -571,7 +565,7 @@ Paint = function(v)
     local y, shown, nh = -6, 0, 0
     if list then
         local groups = Group(items)
-        -- OneBank / OneWarbank: every item in one block, no headers
+        -- onebank / onewarbank: everything in one block, no headers
         if v.mode == "bank" and select(3, TabKind(v)) then
             local all = {}
             for _, g in ipairs(groups) do
@@ -606,7 +600,7 @@ Paint = function(v)
     for i = nh + 1, #v.heads do v.heads[i]:Hide() end
     v.child:SetHeight(math.max(-y, 1))
 
-    -- nothing saved yet: say how to fill it
+    -- nothing saved yet, so say how to fill it
     local empty
     if not list then
         if v.mode == "bags" then
@@ -663,7 +657,7 @@ local function Soon(v)
     v.repaint = true
     C_Timer.After(0.2, function()
         v.repaint = false
-        -- another character's sidebar counts come from the same items
+        -- an alt's sidebar counts come from these same items
         if v == bagsView and AltKey(v) and EUI_Bags:IsVisible() and EUI_Bags.RefreshInventory then
             EUI_Bags:RefreshInventory()
         else
@@ -715,15 +709,14 @@ local function Place(v, mode, left, top, bottom)
 end
 
 -------------------------------------------------------------------------------
---  Bags: hooked into the bags refresh
+--  bags: hooked into the bags refresh
 -------------------------------------------------------------------------------
 bagsView.count = function() return EUI_Bags.Header and EUI_Bags.Header.itemCount end
 bagsView.under = function() return { EUI_Bags._scrollFrame, EUI_Bags._scrollTrack } end
 bagsView.goldRef = function() return EUI_Bags.Money end
 
--- after every bags refresh (FinishRefresh): over the item area while Bank is
--- selected or another character is picked, hidden otherwise. sidebarW: the
--- sidebar's current width.
+-- runs after every bags refresh: covers the items while bank is picked or an
+-- alt is showing, hidden otherwise. sidebarW is the sidebar's width.
 function ns.OfflinePanel(sidebarW)
     local hdr = EUI_Bags.Header
     SyncTitle(bagsView, hdr and hdr.title, hdr and hdr.itemCount)
@@ -739,7 +732,7 @@ function ns.OfflinePanel(sidebarW)
 end
 
 -------------------------------------------------------------------------------
---  Bank window: another character's bank over the live one
+--  bank window: an alt's bank over the live one
 -------------------------------------------------------------------------------
 local EUI_Bank = bankView.win
 if EUI_Bank then
@@ -747,8 +740,7 @@ if EUI_Bank then
     bankView.goldRef = function() return EUI_Bank._warbandGoldText end
     bankView.under = function() return { EUI_Bank._scrollFrame, EUI_Bank._scrollTrack, EUI_Bank._sidebarSF } end
 
-    -- the picked character's tabs, over the live sidebar's list (its header and
-    -- collapse arrow stay live), styled like the live entries
+    -- the alt's tabs over the live sidebar list (header and arrow stay live), styled the same
     local ROW_H, ROW_PAD, ICON = 26, 2, 18
     local rows = {}
     local function Row(i)
@@ -802,7 +794,7 @@ if EUI_Bank then
         local side = v.side
         local c = Offline.Char(ShownKey(v))
         local entries = {}
-        -- the live sidebar's layout: All (its tabs nested under it) and One, per kind
+        -- same layout as the live sidebar: all (tabs nested under it) and one, per kind
         local oneFirst = ns.BankDefaultsToOne and ns.BankDefaultsToOne()
         local function Add(kind, all, one, icon, oneIcon, tabs, bagKey)
             local total = 0
@@ -907,7 +899,7 @@ if EUI_Bank then
         bankView.key, bankView.viewTab = nil, "bank"
         Place(bankView, nil)
     end)
-    -- the live bank resets the slot count while another character's shows
+    -- the live bank keeps resetting the slot count while an alt's showing
     if EUI_Bank._headerItemCount then
         hooksecurefunc(EUI_Bank._headerItemCount, "SetText", function(fs)
             if bankView.painting or bankView.mode ~= "bank" or not bankView.countText then return end
@@ -920,7 +912,7 @@ else
     SyncBank = function() end
 end
 
--- the option toggled: off leaves the Bank view for All Items and goes back to this character
+-- option toggled off: leave the bank view for all items and go back to this character
 function Offline.SyncButton()
     if not (EUI_Bags and EUI_Bags.RefreshInventory) then return end
     if not Offline.Enabled() then

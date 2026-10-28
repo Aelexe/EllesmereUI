@@ -1,26 +1,23 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  EllesmereUIBags_Offline.lua
---  Offline Bank: a copy of every character's bags, character bank and the
---  warband bank, saved account-wide so the viewer (EllesmereUIBags_OfflineView
---  .lua) can show them anywhere, plus item counts in item tooltips.
+--  offline bank: saves every character's bags, bank and the warband bank
+--  account-wide so the viewer can show them anywhere, plus tooltip counts.
 --
---  Store: EllesmereUIBagsInventoryDB (its own SavedVariables, kept out of the
---  profiles so exports and profile sync never carry inventories).
+--  store: EllesmereUIBagsInventoryDB (its own saved vars, so profile exports
+--  and sync never carry inventories)
 --    chars[key] = { name, realm, class, level, bagsTime, bankTime,
 --                   bags = { container... }, bank = { container... } }
 --    warband    = { time, tabs = { container... } }
 --    container  = { size, name?, icon?, links = { [slot] = link },
 --                   counts = { [slot] = count } } (counts only above 1)
---  key = "Name-Realm" (EllesmereUI.RealmGroupName), the gold ledger's key.
+--  key = "Name-Realm" (EllesmereUI.RealmGroupName), same as the gold ledger.
 --
---  Reads only: bags are copied after BAG_UPDATE_DELAYED, the banks while a
---  banker is open. Nothing is saved, hooked or listened to while both the
---  Offline Bank and Tooltip Item Counts options are off.
+--  read only: bags save after BAG_UPDATE_DELAYED, banks while a banker's
+--  open. nothing gets saved, hooked or listened to while both options are off.
 --
---  Syndicator (optional): with Use Syndicator Data on, the viewer reads
---  Syndicator's saved inventories through Syndicator.API instead, our own
---  saving pauses, and Syndicator's tooltip counts stand in for ours.
+--  syndicator (optional): with it on we read Syndicator.API instead, stop
+--  saving our own copies, and let syndicator handle tooltip counts.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
 local ns = select(2, ...)
@@ -46,9 +43,9 @@ local function Active()
 end
 
 -------------------------------------------------------------------------------
---  Store
+--  store
 -------------------------------------------------------------------------------
-local rev = 0          -- bumped on every write; the tooltip index follows it
+local rev = 0          -- goes up on every write so the tooltip index knows to rebuild
 local listeners = {}
 
 function Offline.Store()
@@ -69,7 +66,7 @@ local function OwnKey()
     return name .. "-" .. realm
 end
 
--- Syndicator's tabs ({ slots = { item... }, name, iconTexture }) in our container shape
+-- turns syndicator's tabs ({ slots, name, iconTexture }) into our container shape
 local function SynTabs(list)
     if type(list) ~= "table" then return nil end
     local tabs = {}
@@ -89,7 +86,7 @@ local function SynTabs(list)
     return #tabs > 0 and tabs or nil
 end
 
--- converted entries, rebuilt after any Syndicator update
+-- converted copies, rebuilt whenever syndicator updates
 local synCache, synRev = {}, -1
 local function SynCached(key, build)
     if synRev ~= rev then wipe(synCache); synRev = rev end
@@ -103,7 +100,7 @@ local function SynChar(key)
         local d = SynAPI().GetByCharacterFullName(key)
         local det = type(d) == "table" and d.details
         if type(det) ~= "table" then return nil end
-        -- its bags are plain slot lists; wrap them like tabs
+        -- its bags are just slot lists, so wrap them like tabs
         local bags = {}
         for _, slots in ipairs(type(d.bags) == "table" and d.bags or {}) do bags[#bags + 1] = { slots = slots } end
         return { name = det.character or key, realm = det.realm or det.realmNormalized or "",
@@ -136,14 +133,14 @@ function Offline.Warband()
 end
 function Offline.Rev() return rev end
 
--- something changed: the viewer and the tooltip index catch up
+-- something changed, so the viewer and tooltip index catch up
 local function Changed(what)
     rev = rev + 1
     for _, fn in ipairs(listeners) do fn(what) end
 end
 function Offline.OnChange(fn) listeners[#listeners + 1] = fn end
 
--- Syndicator's characters are removed in Syndicator itself
+-- syndicator's characters get removed in syndicator
 function Offline.CanForget(key)
     return key ~= nil and key ~= Offline.CurrentKey() and not Offline.UsingSyndicator()
 end
@@ -154,7 +151,7 @@ function Offline.Forget(key)
     Changed("forget")
 end
 
--- characters for the picker: realm, then name; the current one flagged
+-- characters for the picker, by realm then name, current one flagged
 function Offline.Characters()
     local list, me = {}, Offline.CurrentKey()
     if Offline.UsingSyndicator() then
@@ -162,7 +159,7 @@ function Offline.Characters()
         for _, key in ipairs(API.GetAllCharacters() or {}) do
             local d = API.GetByCharacterFullName(key)
             local det = type(d) == "table" and d.details
-            -- characters hidden in Syndicator stay hidden here
+            -- anyone hidden in syndicator stays hidden here
             if type(det) == "table" and not (det.show and det.show.inventory == false) then
                 list[#list + 1] = { key = key, name = det.character or key, realm = det.realm or det.realmNormalized or "",
                                     class = det.className, current = key == me }
@@ -193,7 +190,7 @@ local function MyEntry()
     return c
 end
 
--- one container's contents; nil when the game reports no slots
+-- one container's stuff, nil if the game says it has no slots
 local function ReadContainer(bagID)
     local size = C_Container.GetContainerNumSlots(bagID) or 0
     if size <= 0 then return nil end
@@ -210,7 +207,7 @@ local function ReadContainer(bagID)
 end
 
 -------------------------------------------------------------------------------
---  Snapshots
+--  snapshots
 -------------------------------------------------------------------------------
 local BAGS = { 0, 1, 2, 3, 4, 5 }
 local CHAR_BANK, WARBAND_BANK = {}, {}
@@ -235,7 +232,7 @@ local function SaveBags()
     Changed("bags")
 end
 
--- bank tabs with their names and icons; nil when nothing is readable yet
+-- bank tabs with names and icons, nil if nothing's readable yet
 local function ReadTabs(bagIDs, bankType)
     local meta = C_Bank and C_Bank.FetchPurchasedBankTabData and C_Bank.FetchPurchasedBankTabData(bankType)
     local tabs, any = {}, false
@@ -273,7 +270,7 @@ local function SaveBanks()
     if changed then Changed("bank") end
 end
 
--- a burst of updates saves once
+-- a burst of updates only saves once
 local pendingBags, pendingBank = false, false
 local function Flush()
     if pendingBags then pendingBags = false; SaveBags() end
@@ -289,7 +286,7 @@ local function Queue(bags, bank)
 end
 
 -------------------------------------------------------------------------------
---  Events (registered only while an option needs them)
+--  events (only registered while an option needs them)
 -------------------------------------------------------------------------------
 local PIT = Enum.PlayerInteractionType
 local ev = CreateFrame("Frame")
@@ -305,7 +302,7 @@ ev:SetScript("OnEvent", function(_, event, arg)
         end
     elseif event == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" then
         if arg == PIT.Banker or arg == PIT.AccountBanker then
-            Flush()  -- before the contents go unreadable
+            Flush()  -- save before the contents go unreadable
             atBank, atCharBank = false, false
         end
     elseif event == "PLAYERBANKSLOTS_CHANGED" or event == "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED"
@@ -316,7 +313,7 @@ end)
 local EVENTS = { "BAG_UPDATE_DELAYED", "BAG_UPDATE", "PLAYER_INTERACTION_MANAGER_FRAME_SHOW",
     "PLAYER_INTERACTION_MANAGER_FRAME_HIDE", "PLAYERBANKSLOTS_CHANGED",
     "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", "BANK_TABS_CHANGED" }
--- Syndicator's updates refresh the viewer while its data is in use
+-- syndicator updates refresh the viewer while we're using its data
 local synHooked = false
 local function HookSyndicator()
     if synHooked or not SynAPI() then return end
@@ -332,7 +329,7 @@ end
 local listening = false
 function Offline.Sync()
     if Offline.UsingSyndicator() then HookSyndicator() end
-    rev = rev + 1  -- the source may have changed
+    rev = rev + 1  -- the source might've changed
     local on = Active()
     if on == listening then return end
     listening = on
@@ -345,9 +342,9 @@ function Offline.Sync()
 end
 
 -------------------------------------------------------------------------------
---  Tooltip item counts
+--  tooltip item counts
 -------------------------------------------------------------------------------
--- the item id behind a link (cages count as the pet cage item)
+-- item id from a link (pet cages count as the cage item)
 local function LinkID(link)
     local kind, id = link:match("|H(%a+):(%d+)")
     if kind == "battlepet" then return 82800 end
@@ -436,7 +433,7 @@ local function OnItemTooltip(tooltip, data)
     end
 end
 
--- the post call can't be removed: it returns at once while off
+-- the post call can't be unhooked, so it just bails while off
 local hooked = false
 function Offline.SyncTooltip()
     if hooked or not (listening and Offline.CountsEnabled()) then return end
@@ -446,7 +443,7 @@ function Offline.SyncTooltip()
 end
 
 -------------------------------------------------------------------------------
---  Login
+--  login
 -------------------------------------------------------------------------------
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("PLAYER_LOGIN")

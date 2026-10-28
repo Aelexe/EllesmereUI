@@ -159,7 +159,7 @@ initFrame:SetScript("OnEvent", function(self)
                     EllesmereUI.BlankRowCfg()
                 ); y = y - h
 
-                -- Offline Bank (EllesmereUIBags_Offline.lua; absent on WoW Forever)
+                -- offline bank (not on wow forever)
                 local Offline = BagsNS and BagsNS.Offline
                 if Offline then
                     _, h = W:SectionHeader(parent, "OFFLINE BANK", y); y = y - h

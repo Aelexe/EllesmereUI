@@ -56,9 +56,9 @@ local BAGS_DEFAULTS = {
         bagWindowLocked       = false,   -- footer lock icon: no resizing or moving
         bankWindowLocked      = false,
         bagOpenWithCharacter  = false,
-        bagOfflineBank        = true,    -- Offline Bank: saved bags / banks, Bank in the bags sidebar (EllesmereUIBags_Offline.lua)
-        bagTooltipCounts      = true,    -- Tooltip Item Counts from the same saved copies
-        bagSyndicator         = false,   -- Offline Bank reads Syndicator's saved inventories
+        bagOfflineBank        = true,    -- offline bank: saves bags/banks, adds bank to the bags sidebar
+        bagTooltipCounts      = true,    -- item counts in tooltips, from the same saves
+        bagSyndicator         = false,   -- read syndicator's saved data instead
         -- bagFrameStrata has no default: unset reads the retired
         -- bagAllowWindowsOverBags (ns.BagFrameStrata)
         bagStackSplitter      = false,

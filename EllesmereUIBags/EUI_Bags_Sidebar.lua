@@ -39,8 +39,7 @@ local _sidebarBtns = {}  -- array of sidebar button frames
 
 -- 0 while collapsed under Hide Sidebar Icons When Collapsed (default off): the
 -- sidebar hides and its expand arrow sits left of the window title.
--- fixed views above the categories: All Items, OneBag, MultiBag, and Bank
--- while the Offline Bank is on (EllesmereUIBags_OfflineView.lua)
+-- fixed views up top: all items, onebag, multibag, plus bank when offline bank is on
 local function FixedViewCount()
     return (ns.Offline and ns.Offline.Enabled()) and 4 or 3
 end
@@ -146,7 +145,7 @@ local function ComputeDropTarget()
     local sidebarTop = sidebar:GetTop() * scale
     local localY = (sidebarTop - cy) / scale
 
-    -- Offset past sidebar header + the fixed view buttons
+    -- offset past the sidebar header and the fixed views
     localY = localY - 24 - FixedViewCount() * (SIDEBAR_BTN_H + SIDEBAR_PAD)
 
     if localY < 0 then return 1 end
@@ -227,7 +226,7 @@ end
 
 -- Compute insert line Y position for a given category target index
 local function GetInsertLineY(targetCatIdx)
-    -- Offset: header (24) + the fixed view buttons
+    -- offset: header (24) plus the fixed views
     local topOffset = 24 + FixedViewCount() * (SIDEBAR_BTN_H + SIDEBAR_PAD)
     local visSlot = 0
     local cats = EUI_CategoryManager:GetCategories()
@@ -1117,7 +1116,7 @@ local function BuildSidebarButtons(categoryCounts, totalCount)
     for _, _k in ipairs({ "all", "onebag", "multibag" }) do
         if _k ~= _dbt then displayList[#displayList + 1] = _fixedViews[_k] end
     end
-    -- Bank: the Offline Bank view (EllesmereUIBags_OfflineView.lua)
+    -- bank: the offline bank view
     if FixedViewCount() == 4 then
         displayList[#displayList + 1] = { catIdx = -3, name = EllesmereUI.L("Bank"), icon = 133784 }
     end
