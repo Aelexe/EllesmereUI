@@ -88,14 +88,22 @@ local function BuildRuleDurationFormatter(withSecondsUnit, preciseThreshold)
     -- rejected or default-rounded depending on validation strictness.)
     local points = {
         { threshold = 0,     format = withSecondsUnit and "%ds" or "%d",  step = 1, rounding = Down },
+        -- 90 second boundary catcher.
+        -- To follow Blizzard's format, seconds begin displaying with 90 seconds remaining.
+        -- Currently, the tooltip rounds Up  until 60 seconds remain, whereas it rounds
+        -- down everywhere else. To match Blizzard, using a ceiling until 90 seconds
+        -- will be most accurate. Additionally, steps use 60, 3600, and 86400 so
+        -- rounding applies to the minute, hour, and day, respectively, rather than
+        -- just the second.
+
         -- Minute-boundary catcher (field report: text flashed "0" just under a minute).
-        -- Seconds round UP, so a raw value in (59, 60) can reach 60 and land at this
+        -- Seconds round DOWN, so a raw value in (59, 60) can reach 59 and land at this
         -- threshold; the old Down bucket here floored the raw back to 0 -> "0m" for a
-        -- moment. Up in this one-second band yields exactly 1 -> "1m". The Down bucket
-        -- resumes at 61, so every later reading keeps the legacy floored text unchanged
-        -- ("1m" until 120, "59m" until the hour). Down never rounds ACROSS a threshold,
+        -- moment. Up in this one-second band yields exactly 1 -> "1m". The Up  bucket
+        -- resumes at 91, so every later reading keeps the legacy ceiling text unchanged
+        -- ("2m" until 91, "1h" until 59). Up never rounds ACROSS a threshold,
         -- so no other unit boundary has this collision.
-        { threshold = 60,    format = "%dm", step = 60,    rounding = Up,  components = { { div = 60 } } },
+        { threshold = 91,    format = "%dm", step = 60,    rounding = Up,  components = { { div = 60 } } },
         { threshold = 3600,  format = "%dh", step = 3600,  rounding = Up,  components = { { div = 3600 } } },
         { threshold = 86400, format = "%dd", step = 86400, rounding = Up,  components = { { div = 86400 } } },
     }
@@ -106,11 +114,11 @@ local function BuildRuleDurationFormatter(withSecondsUnit, preciseThreshold)
         -- Below the selected threshold, a clock-style value such as 5:23;
         -- under a minute plain seconds ("45", or "45s" with the unit on),
         -- matching the standard formatter's sub-minute look. The 60-band
-        -- catcher mirrors the stock table's: seconds round UP, so a raw value
-        -- in (59, 60) reaches 60 and must land as exactly 1:00, not wrap.
+        -- catcher mirrors the stock table's: seconds round DOWN, so a raw value
+        -- in (59, 60) reaches 59 and would land as exactly 59, not wrap.
         points = {
             { threshold = 0, format = withSecondsUnit and "%ds" or "%d", step = 1, rounding = Down },
-            { threshold = 60, format = "%d:%02d", step = 1, rounding = Up,
+            { threshold = 60, format = "%d:%02d", step = 1, rounding = Down,
                 components = { { div = 60 }, { mod = 60 } } },
             { threshold = preciseThreshold, format = "%dm", step = 60, rounding = Up,
                 components = { { div = 60 } } },
