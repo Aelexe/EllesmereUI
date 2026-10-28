@@ -2886,25 +2886,33 @@ local function FinishDrag(apply)
     if not target then return end
     local CM = _G.EUI_CategoryManager
     local cats = CM:GetCategories()
-    local _, moving = DragBlock(d.btn, d.scope)
-    if not moving then return end
-    table.sort(moving)
+    local _, block = DragBlock(d.btn, d.scope)
+    if not block then return end
     local insertAt = d.after and (math.max(unpack(target)) + 1) or math.min(unpack(target))
-    if insertAt >= moving[1] and insertAt <= moving[#moving] + 1 then return end
+    table.sort(block)
+    if insertAt >= block[1] and insertAt <= block[#block] + 1 then return end
+    -- equip sets follow item set gear on their own (SaveState), so the rest
+    -- moves one ReorderCategory at a time (its junk / set rules apply), each
+    -- dropped in just above the target row; found by reference every step
+    local moving, sets = {}, false
+    for _, i in ipairs(block) do
+        if cats[i].isEquipSet then sets = true else moving[#moving + 1] = cats[i] end
+    end
+    local before = cats[insertAt]  -- nil: the end of the list
     -- keep the bags' selection on the same category, not the same index
     local selIdx, selGroup = ns.GetSelection and ns.GetSelection()
-    local selCat = selIdx and selIdx > 0 and cats[selIdx]
-    local entries = {}
-    for k = #moving, 1, -1 do
-        if moving[k] < insertAt then insertAt = insertAt - 1 end
-        table.insert(entries, 1, table.remove(cats, moving[k]))
+    local selKey = selIdx and selIdx > 0 and cats[selIdx] and cats[selIdx]._defaultName
+    local function IndexOf(c) for i, x in ipairs(cats) do if x == c then return i end end end
+    for _, c in ipairs(moving) do
+        local from = IndexOf(c)
+        if from then CM:ReorderCategory(from, before and IndexOf(before) or #cats + 1) end
     end
-    -- junk stays at the bottom
-    if cats[#cats] and cats[#cats].isJunk and insertAt > #cats then insertAt = #cats end
-    for k, c in ipairs(entries) do table.insert(cats, insertAt + k - 1, c) end
-    CM:SaveState()
-    if selCat and ns.SetSelection then
-        for ci, c in ipairs(cats) do if c == selCat then ns.SetSelection(ci, selGroup); break end end
+    -- the sets catch up with their anchor on a rebuild from the saved order
+    if sets then CM:OnEquipmentSetsChanged() end
+    if selKey and ns.SetSelection then
+        for ci, c in ipairs(CM:GetCategories()) do
+            if c._defaultName == selKey then ns.SetSelection(ci, selGroup); break end
+        end
     end
     EUI_Bank:RefreshBank()
     if _G.EUI_Bags and _G.EUI_Bags:IsVisible() and _G.EUI_Bags.RefreshInventory then _G.EUI_Bags:RefreshInventory() end
@@ -3007,6 +3015,8 @@ function BuildBankSidebar()
         end)
         btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         btn:SetScript("OnMouseDown", function(self, button)
+            -- a drop over another row never clicks this one, so clear it here
+            self._didDrag = false
             if button == "LeftButton" and not self._isPurchaseTab then BeginDrag(self) end
         end)
         btn:SetScript("OnClick", function(self, button)

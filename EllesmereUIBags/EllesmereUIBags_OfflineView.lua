@@ -408,47 +408,61 @@ end
 
 local waiting = false  -- item data asked for; one repaint when it lands
 
--- the bags' category for an item; disabled categories go to the catch-all
-local function Classify(link, id, q)
+-- every saved item as a display entry with its bags category; one pass per
+-- list, store rev and frame, so the sidebar counts and the paint share it
+local pass = {}
+local function Classified(list)
+    local now = GetTime()
+    if pass.list == list and pass.rev == Offline.Rev() and pass.time == now then
+        return pass.items, pass.used, pass.total
+    end
+    local items, used, total = {}, 0, 0
     local mgr = _G.EUI_CategoryManager
     local cats = mgr and mgr:GetCategories()
-    if not cats then return 0 end
+    -- the catch-all once, not per item; disabled categories land in it
     local catchAll
-    for i, cat in ipairs(cats) do if cat.isCatchAll then catchAll = i end end
-    local idx = mgr:ClassifyItem(link, id, nil, nil, q) or catchAll or #cats
-    local cat = cats[idx]
+    for i, cat in ipairs(cats or {}) do if cat.isCatchAll then catchAll = i end end
     local disabled = BP().bagDisabledCategories or _emptyP
-    if cat and cat._defaultName and disabled[cat._defaultName] and catchAll then idx = catchAll end
-    return idx
-end
-
--- saved items as display entries, only the filter's categories if there is one
-local function Collect(list, query, filter)
-    local items, used, total = {}, 0, 0
     for _, t in ipairs(type(list) == "table" and list or {}) do
         if type(t) == "table" then
             total = total + (t.size or 0)
             for slot, link in pairs(type(t.links) == "table" and t.links or {}) do
                 used = used + 1
-                local name = link:match("%[(.-)%]") or ""
-                if query == "" or name:lower():find(query, 1, true) then
-                    local id = Offline.LinkID(link)
-                    local _, _, q, _, _, _, _, _, _, icon = GetItemInfo(link)
-                    if q == nil then
-                        waiting = true
-                        if id then C_Item.RequestLoadItemDataByID(id) end
-                    end
-                    local cat = Classify(link, id, q or 1)
-                    if not filter or filter[cat] then
-                        local _, _, _, _, instIcon, classID = GetItemInfoInstant(link)
-                        items[#items + 1] = {
-                            link = link, id = id, name = name, q = q or 1, icon = icon or instIcon, cat = cat,
-                            n = (t.counts and t.counts[slot]) or 1,
-                            gear = classID == ITEM_CLASS_WEAPON or classID == ITEM_CLASS_ARMOR,
-                        }
-                    end
+                local id = Offline.LinkID(link)
+                local _, _, q, _, _, _, _, _, _, icon = GetItemInfo(link)
+                if q == nil then
+                    waiting = true
+                    if id then C_Item.RequestLoadItemDataByID(id) end
                 end
+                local idx = 0
+                if cats then
+                    idx = mgr:ClassifyItem(link, id, nil, nil, q or 1) or catchAll or #cats
+                    local cat = cats[idx]
+                    if catchAll and cat and cat._defaultName and disabled[cat._defaultName] then idx = catchAll end
+                end
+                local name = link:match("%[(.-)%]") or ""
+                local _, _, _, _, instIcon, classID = GetItemInfoInstant(link)
+                items[#items + 1] = {
+                    link = link, id = id, name = name, lower = name:lower(), q = q or 1,
+                    icon = icon or instIcon, cat = idx, n = (t.counts and t.counts[slot]) or 1,
+                    gear = classID == ITEM_CLASS_WEAPON or classID == ITEM_CLASS_ARMOR,
+                }
             end
+        end
+    end
+    pass.list, pass.rev, pass.time = list, Offline.Rev(), now
+    pass.items, pass.used, pass.total = items, used, total
+    return items, used, total
+end
+
+-- the classified items, cut down to the search and the filter's categories
+local function Collect(list, query, filter)
+    local all, used, total = Classified(list)
+    if query == "" and not filter then return all, used, total end
+    local items = {}
+    for _, it in ipairs(all) do
+        if (query == "" or it.lower:find(query, 1, true)) and (not filter or filter[it.cat]) then
+            items[#items + 1] = it
         end
     end
     return items, used, total
@@ -458,7 +472,7 @@ end
 function ns.OfflineCounts()
     local c = Offline.Char(bagsView.key)
     local counts, total = {}, 0
-    for _, it in ipairs((Collect(c and c.bags, ""))) do
+    for _, it in ipairs((Classified(c and c.bags))) do
         counts[it.cat] = (counts[it.cat] or 0) + 1
         total = total + 1
     end
@@ -676,7 +690,10 @@ local function SyncEvents()
     end
     ev:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
 end
-Offline.OnChange(function()
+-- this character's own bags never show in a panel (they're live), so their
+-- saves don't repaint anything
+Offline.OnChange(function(what)
+    if what == "bags" then return end
     for _, v in ipairs(views) do if v.panel and v.panel:IsShown() then Soon(v) end end
 end)
 

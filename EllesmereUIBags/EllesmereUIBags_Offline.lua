@@ -206,6 +206,25 @@ local function ReadContainer(bagID)
     return { size = size, links = links, counts = counts }
 end
 
+-- true when two saved container lists hold the same items
+local function SameMap(a, b)
+    for k, v in pairs(a) do if b[k] ~= v then return false end end
+    for k in pairs(b) do if a[k] == nil then return false end end
+    return true
+end
+local function SameList(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" or #a ~= #b then return false end
+    for i = 1, #a do
+        local x, y = a[i], b[i]
+        if type(x) ~= type(y) then return false end
+        if type(x) == "table" and not (x.size == y.size and x.name == y.name and x.icon == y.icon
+            and SameMap(x.links, y.links) and SameMap(x.counts, y.counts)) then return false end
+    end
+    return true
+end
+
+local PatchIndex  -- below, with the tooltip index
+
 -------------------------------------------------------------------------------
 --  snapshots
 -------------------------------------------------------------------------------
@@ -228,7 +247,11 @@ local function SaveBags()
     if not c then return end
     local bags = {}
     for _, bag in ipairs(BAGS) do bags[#bags + 1] = ReadContainer(bag) or false end
-    c.bags, c.bagsTime = bags, time()
+    c.bagsTime = time()
+    -- most bag updates move nothing we keep (cooldowns, locks): no change then
+    if SameList(c.bags, bags) then return end
+    PatchIndex(c.bags, bags, "bags", OwnKey())
+    c.bags = bags
     Changed("bags")
 end
 
@@ -257,14 +280,24 @@ local function SaveBanks()
     if atCharBank then
         local tabs = ReadTabs(CHAR_BANK, Enum.BankType.Character)
         local c = tabs and MyEntry()
-        if c then c.bank, c.bankTime, changed = tabs, time(), true end
+        if c then
+            c.bankTime = time()
+            if not SameList(c.bank, tabs) then
+                PatchIndex(c.bank, tabs, "bank", OwnKey())
+                c.bank, changed = tabs, true
+            end
+        end
     end
     local locked = C_Bank and C_Bank.FetchBankLockedReason and C_Bank.FetchBankLockedReason(Enum.BankType.Account)
     if locked == nil then
         local tabs = ReadTabs(WARBAND_BANK, Enum.BankType.Account)
         if tabs then
             local w = Offline.Store().warband
-            w.tabs, w.time, changed = tabs, time(), true
+            w.time = time()
+            if not SameList(w.tabs, tabs) then
+                PatchIndex(w.tabs, tabs)
+                w.tabs, changed = tabs, true
+            end
         end
     end
     if changed then Changed("bank") end
@@ -354,23 +387,28 @@ Offline.LinkID = LinkID
 
 local index, indexRev  -- itemID -> { [key] = { bags, bank } }, warband[itemID]
 
-local function AddContainers(list, into, field, owner)
+-- sign -1 takes a list back out (rows that hit zero go away)
+local function AddContainers(list, into, field, owner, sign)
     if type(list) ~= "table" then return end
+    sign = sign or 1
     for _, t in ipairs(list) do
         if type(t) == "table" and type(t.links) == "table" then
             for slot, link in pairs(t.links) do
                 local id = LinkID(link)
                 if id then
-                    local n = (t.counts and t.counts[slot]) or 1
+                    local n = ((t.counts and t.counts[slot]) or 1) * sign
                     local row = into[id]
                     if not row then row = {}; into[id] = row end
                     if owner then
                         local e = row[owner]
                         if not e then e = { bags = 0, bank = 0 }; row[owner] = e end
                         e[field] = e[field] + n
+                        if e.bags + e.bank <= 0 then row[owner] = nil end
                     else
                         row.n = (row.n or 0) + n
+                        if row.n <= 0 then row.n = nil end
                     end
+                    if next(row) == nil then into[id] = nil end
                 end
             end
         end
@@ -392,6 +430,18 @@ local function Index()
     return index
 end
 
+-- one list swapped for another: fix the index up in place instead of a full
+-- rebuild on the next hover. no owner = the warband bank. runs before the
+-- write's Changed, so it marks the index as current for the next rev.
+PatchIndex = function(old, new, field, owner)
+    -- rev + 1: an earlier patch in the same write (the bank, then the warband)
+    if not (index and (indexRev == rev or indexRev == rev + 1)) then return end
+    local into = owner and index.chars or index.warband
+    AddContainers(old, into, field, owner, -1)
+    AddContainers(new, into, field, owner)
+    indexRev = rev + 1
+end
+
 local function ClassHex(class)
     local c = class and C_ClassColor and C_ClassColor.GetClassColor(class)
     return c and c:GenerateHexColorMarkup() or "|cffffffff"
@@ -405,7 +455,7 @@ local function OnItemTooltip(tooltip, data)
     if type(id) ~= "number" or (issecretvalue and issecretvalue(id)) then return end
     local idx = Index()
     local row, war = idx.chars[id], idx.warband[id]
-    if not row and not war then return end
+    if not row and not (war and war.n) then return end
 
     local db, lines, total = Offline.Store(), {}, 0
     for key, e in pairs(row or {}) do
