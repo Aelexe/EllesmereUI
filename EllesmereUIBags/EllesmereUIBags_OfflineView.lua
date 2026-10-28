@@ -1,48 +1,45 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  EllesmereUIBags_OfflineView.lua
---  Offline Bank viewer: any saved character's bank, or the warband bank,
---  from anywhere (data from EllesmereUIBags_Offline.lua). Looks like the
---  bank window, but its item buttons are plain display buttons: they never
---  touch a real bag slot, so the window is safe to open at any time, combat
---  included. Hover for the item tooltip; Shift-click links, Ctrl-click
---  previews (HandleModifiedItemClick).
+--  Offline Bank view inside the bags window: Bank in the bags sidebar (the
+--  selection -3, EUI_Bags_Sidebar.lua) shows any saved character's bank, or
+--  the warband bank, from anywhere (data from EllesmereUIBags_Offline.lua).
 --
---  Opened from Bank in the bags sidebar (EUI_Bags_Sidebar.lua) or /euibank;
---  at a banker the live bank window is the one that shows.
+--  The view is a panel over the bags' item area (FinishRefresh in
+--  EUI_Bags_Refresh.lua calls ns.OfflinePanel after every refresh; the bags
+--  paint no items while Bank is selected). Its item buttons are plain display
+--  buttons: they never touch a real bag slot, so the view is safe at any time,
+--  combat included. Hover for the item tooltip; Shift-click links, Ctrl-click
+--  previews (HandleModifiedItemClick). The bags search box filters it too.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
 local ns = select(2, ...)
 local Offline = ns.Offline
-if not Offline then return end  -- WoW Forever, or the store failed to load
-
+local I = ns._bagsInternals
+if not (Offline and I) then return end  -- WoW Forever, or a bags file failed to load
 
 local GetItemInfo, GetItemInfoInstant = C_Item.GetItemInfo, C_Item.GetItemInfoInstant
 local _emptyP = {}
 local function BP() return (EUI._bagsDB and EUI._bagsDB.profile) or _emptyP end
 
 local SLOT_SIZE, SPACING = 34, 4
-local HEADER_H, FOOTER_H, PAD = 35, 28, 10
+local BAR_H, PAD = 30, 10
 local ITEM_CLASS_WEAPON, ITEM_CLASS_ARMOR = Enum.ItemClass.Weapon, Enum.ItemClass.Armor
+local BANK_VIEW = -3
+ns.OFFLINE_BANK_VIEW = BANK_VIEW
 
 local function GetFont() return EUI.GetFontPath("bags") end
 local function SetFont(fs, size)
     EUI.PrimeFontShadow(fs, true)
     fs:SetFont(GetFont(), size, EUI.GetFontOutlineFlag("bags"))
 end
-local function Columns() return BP().bankColumns or 14 end
-local function Height() return BP().bankHeight or 500 end
 
 -- what's showing
-local viewKey     -- character key
-local viewTab = "bank"  -- "bank" | "warband"
-local query = ""
+local viewKey             -- character key
+local viewTab = "bank"    -- "bank" | "warband"
 
--------------------------------------------------------------------------------
---  Window
--------------------------------------------------------------------------------
-local win, header, scroll, child, footer
-local slots, heads = {}, {}
+local panel, bar, scroll, child
+local slots, heads, tabs = {}, {}, {}
 
 local function Hex(class)
     local c = class and C_ClassColor and C_ClassColor.GetClassColor(class)
@@ -57,11 +54,26 @@ local function Age(t)
     return EllesmereUI.Lf("%1$s ago", SecondsToTime(s, false, false, 1))
 end
 
-local Refresh  -- forward
+-- the bags search, lower-cased ("" when empty)
+local function Query()
+    local box = EUI_Bags._searchBox
+    return box and (box:GetText() or ""):lower() or ""
+end
 
+local Paint  -- forward
+
+local function Repaint()
+    if scroll then scroll:SetVerticalScroll(0) end
+    Paint()
+end
+
+-------------------------------------------------------------------------------
+--  The panel: a bar (character, Bank / Warband, gold and saved time) over a
+--  scrolling grid
+-------------------------------------------------------------------------------
 local function TabButton(text, key)
-    local b = CreateFrame("Button", nil, header)
-    b:SetHeight(HEADER_H)
+    local b = CreateFrame("Button", nil, bar)
+    b:SetHeight(BAR_H)
     b.text = b:CreateFontString(nil, "OVERLAY")
     SetFont(b.text, 12)
     b.text:SetPoint("CENTER")
@@ -72,17 +84,12 @@ local function TabButton(text, key)
     b.line:SetPoint("BOTTOMRIGHT", -6, 0)
     b.line:SetHeight(2)
     b.key = key
-    b:SetScript("OnClick", function()
-        viewTab = key
-        if scroll then scroll:SetVerticalScroll(0) end
-        Refresh()
-    end)
+    b:SetScript("OnClick", function() viewTab = key; Repaint() end)
     b:SetScript("OnEnter", function(self) if viewTab ~= self.key then self.text:SetTextColor(1, 1, 1) end end)
     b:SetScript("OnLeave", function(self) if viewTab ~= self.key then self.text:SetTextColor(0.6, 0.6, 0.6) end end)
     return b
 end
 
-local tabs = {}
 local function PaintTabs()
     local r, g, b = 0.05, 0.82, 0.62
     if EUI.GetAccentColor then r, g, b = EUI.GetAccentColor() end
@@ -106,8 +113,7 @@ local function OpenPicker(owner)
             end
             root:CreateRadio(Hex(c.class) .. c.name .. "|r", function() return viewKey == c.key end, function()
                 viewKey = c.key
-                if scroll then scroll:SetVerticalScroll(0) end
-                Refresh()
+                Repaint()
             end)
         end
         local c = Offline.Char(viewKey)
@@ -116,62 +122,45 @@ local function OpenPicker(owner)
             root:CreateButton(EllesmereUI.Lf("Forget %1$s", c.name or viewKey), function()
                 Offline.Forget(viewKey)
                 viewKey = Offline.CurrentKey()
-                Refresh()
+                Repaint()
             end)
         end
     end)
 end
 
-local function SavePosition()
-    local point, _, rel, x, y = win:GetPoint(1)
-    BP().bagOfflinePos = { point, rel, x, y }
-end
-
 local function Build()
-    if win then return end
-    win = CreateFrame("Frame", "EUI_BagsOfflineFrame", UIParent)
-    win:SetToplevel(true)
-    local strata = ns.BagFrameStrata and ns.BagFrameStrata() or "MEDIUM"
-    win:SetFrameStrata(strata)
-    win:SetFrameLevel(strata == "HIGH" and 50 or 1)
-    win:EnableMouse(true)
-    win:SetMovable(true)
-    win:SetClampedToScreen(true)
-    win:Hide()
-    if EUI.RegisterEscapeClose then EUI.RegisterEscapeClose(win) end
-
-    local bg = win:CreateTexture(nil, "BACKGROUND")
+    if panel then return end
+    -- above the pinned item buttons (window level + 9) so the bags never show through
+    panel = CreateFrame("Frame", nil, EUI_Bags)
+    panel:SetFrameLevel(EUI_Bags:GetFrameLevel() + 40)
+    panel:EnableMouse(true)
+    panel:Hide()
+    local bg = panel:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png")
-    local shade = win:CreateTexture(nil, "BACKGROUND", nil, 1)
+    local shade = panel:CreateTexture(nil, "BACKGROUND", nil, 1)
     shade:SetAllPoints()
     shade:SetColorTexture(0, 0, 0, 0.25)
-    EUI.MakeBorder(win, 1, 1, 1, 0.15, EUI.PP)
 
-    -- header: character picker, the three views, search, close
-    header = CreateFrame("Frame", nil, win)
-    header:SetPoint("TOPLEFT")
-    header:SetPoint("TOPRIGHT")
-    header:SetHeight(HEADER_H)
-    header:EnableMouse(true)
-    header:RegisterForDrag("LeftButton")
-    header:SetScript("OnDragStart", function() win:StartMoving() end)
-    header:SetScript("OnDragStop", function() win:StopMovingOrSizing(); SavePosition() end)
-    local hbg = header:CreateTexture(nil, "BACKGROUND", nil, 1)
-    hbg:SetAllPoints()
-    hbg:SetColorTexture(0, 0, 0, 0.5)
+    bar = CreateFrame("Frame", nil, panel)
+    bar:SetPoint("TOPLEFT")
+    bar:SetPoint("TOPRIGHT")
+    bar:SetHeight(BAR_H)
+    local bbg = bar:CreateTexture(nil, "BACKGROUND", nil, 2)
+    bbg:SetAllPoints()
+    bbg:SetColorTexture(0, 0, 0, 0.25)
     local px = (EUI.PP and EUI.PP.mult) or 1
-    local sep = header:CreateTexture(nil, "ARTWORK")
+    local sep = bar:CreateTexture(nil, "ARTWORK")
     sep:SetHeight(px)
     sep:SetPoint("BOTTOMLEFT")
     sep:SetPoint("BOTTOMRIGHT")
     sep:SetColorTexture(0.15, 0.15, 0.15, 1)
 
-    local who = CreateFrame("Button", nil, header)
-    who:SetHeight(HEADER_H)
-    who:SetPoint("LEFT", 2, 0)
+    local who = CreateFrame("Button", nil, bar)
+    who:SetHeight(BAR_H)
+    who:SetPoint("LEFT", 4, 0)
     who.text = who:CreateFontString(nil, "OVERLAY")
-    SetFont(who.text, 13)
+    SetFont(who.text, 12)
     who.text:SetPoint("LEFT", 6, 0)
     who.arrow = who:CreateTexture(nil, "OVERLAY")
     who.arrow:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-arrow-down3.png")
@@ -187,7 +176,7 @@ local function Build()
         self.arrow:SetAlpha(0.7)
         EUI.HideWidgetTooltip()
     end)
-    header.who = who
+    bar.who = who
 
     local prev = who
     for _, d in ipairs({ { EllesmereUI.L("Bank"), "bank" }, { EllesmereUI.L("Warband"), "warband" } }) do
@@ -197,87 +186,34 @@ local function Build()
         prev = t
     end
 
-    local close = CreateFrame("Button", nil, header)
-    close:SetSize(12, 12)
-    close:SetPoint("RIGHT", -9, 0)
-    close.icon = close:CreateTexture(nil, "OVERLAY")
-    close.icon:SetAllPoints()
-    close.icon:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-close.png")
-    close.icon:SetAlpha(0.7)
-    close:SetScript("OnEnter", function() close.icon:SetAlpha(0.9) end)
-    close:SetScript("OnLeave", function() close.icon:SetAlpha(0.7) end)
-    close:SetScript("OnClick", function() win:Hide() end)
+    bar.info = bar:CreateFontString(nil, "OVERLAY")
+    SetFont(bar.info, 11)
+    bar.info:SetPoint("RIGHT", -10, 0)
+    bar.info:SetTextColor(0.6, 0.6, 0.6)
+    bar.info:SetJustifyH("RIGHT")
 
-    -- search: matches the item names in the saved links (no game filter needed)
-    local search = CreateFrame("EditBox", nil, header)
-    search:SetSize(140, 22)
-    search:SetPoint("RIGHT", close, "LEFT", -14, 0)
-    search:SetFont(GetFont(), 12, "")
-    search:SetAutoFocus(false)
-    search:SetTextInsets(5, 22, 0, 0)
-    local sbg = search:CreateTexture(nil, "BACKGROUND")
-    sbg:SetAllPoints()
-    sbg:SetColorTexture(0.02, 0.02, 0.02, 1)
-    if EUI.PanelPP then EUI.PanelPP.CreateBorder(search, 0.25, 0.25, 0.25, 1, 1, "OVERLAY", 7) end
-    local hint = search:CreateFontString(nil, "OVERLAY")
-    SetFont(hint, 11)
-    hint:SetPoint("LEFT", 5, 0)
-    hint:SetText(EllesmereUI.L("Search..."))
-    hint:SetTextColor(0.4, 0.4, 0.4)
-    search:SetScript("OnEscapePressed", function(self) self:SetText(""); self:ClearFocus() end)
-    search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    search:SetScript("OnTextChanged", function(self)
-        local text = self:GetText() or ""
-        hint:SetShown(text == "")
-        local q = text:lower()
-        if q ~= query then
-            query = q
-            Refresh()
-        end
-    end)
-
-    -- body
-    scroll = CreateFrame("ScrollFrame", nil, win)
-    scroll:SetPoint("TOPLEFT", 0, -HEADER_H)
-    scroll:SetPoint("BOTTOMRIGHT", 0, FOOTER_H)
+    scroll = CreateFrame("ScrollFrame", nil, panel)
+    scroll:SetPoint("TOPLEFT", 0, -BAR_H)
+    scroll:SetPoint("BOTTOMRIGHT")
     scroll:EnableMouseWheel(true)
     child = CreateFrame("Frame", nil, scroll)
     child:SetSize(1, 1)
     scroll:SetScrollChild(child)
     scroll:SetScript("OnMouseWheel", function(self, delta)
         local max = math.max(child:GetHeight() - self:GetHeight(), 0)
-        local v = math.min(math.max(self:GetVerticalScroll() - delta * (SLOT_SIZE + SPACING) * 2, 0), max)
-        self:SetVerticalScroll(v)
+        self:SetVerticalScroll(math.min(math.max(self:GetVerticalScroll() - delta * (SLOT_SIZE + SPACING) * 2, 0), max))
     end)
-    win.empty = win:CreateFontString(nil, "OVERLAY")
-    SetFont(win.empty, 12)
-    win.empty:SetPoint("TOPLEFT", scroll, "TOPLEFT", PAD + 6, -PAD - 4)
-    win.empty:SetPoint("RIGHT", scroll, "RIGHT", -PAD, 0)
-    win.empty:SetJustifyH("LEFT")
-    win.empty:SetTextColor(0.6, 0.6, 0.6)
+    panel.empty = panel:CreateFontString(nil, "OVERLAY")
+    SetFont(panel.empty, 12)
+    panel.empty:SetPoint("TOPLEFT", scroll, "TOPLEFT", PAD + 6, -PAD - 4)
+    panel.empty:SetPoint("RIGHT", scroll, "RIGHT", -PAD, 0)
+    panel.empty:SetJustifyH("LEFT")
+    panel.empty:SetTextColor(0.6, 0.6, 0.6)
 
-    -- footer: gold left, slots and when it was saved right
-    footer = CreateFrame("Frame", nil, win)
-    footer:SetPoint("BOTTOMLEFT")
-    footer:SetPoint("BOTTOMRIGHT")
-    footer:SetHeight(FOOTER_H)
-    local fbg = footer:CreateTexture(nil, "BACKGROUND", nil, 1)
-    fbg:SetAllPoints()
-    fbg:SetColorTexture(0, 0, 0, 0.35)
-    footer.gold = footer:CreateFontString(nil, "OVERLAY")
-    SetFont(footer.gold, 11)
-    footer.gold:SetPoint("LEFT", 8, 0)
-    footer.info = footer:CreateFontString(nil, "OVERLAY")
-    SetFont(footer.info, 11)
-    footer.info:SetPoint("RIGHT", -8, 0)
-    footer.info:SetTextColor(0.6, 0.6, 0.6)
-
-    win:SetScript("OnHide", function() GameTooltip:Hide() end)
-    local pos = BP().bagOfflinePos
-    if type(pos) == "table" and pos[1] then
-        win:SetPoint(pos[1], UIParent, pos[2] or pos[1], pos[3] or 0, pos[4] or 0)
-    else
-        win:SetPoint("CENTER", -200, 60)
+    panel:SetScript("OnHide", function() GameTooltip:Hide() end)
+    -- the bags search filters this view too
+    if EUI_Bags._searchBox then
+        EUI_Bags._searchBox:HookScript("OnTextChanged", function() if panel:IsShown() then Repaint() end end)
     end
 end
 
@@ -327,7 +263,6 @@ local function Head(i)
     f = CreateFrame("Frame", nil, child)
     f:SetHeight(20)
     f.label = f:CreateFontString(nil, "OVERLAY")
-    SetFont(f.label, 11)
     f.label:SetPoint("LEFT")
     f.label:SetTextColor(0.7, 0.7, 0.7)
     local px = (EUI.PP and EUI.PP.mult) or 1
@@ -356,8 +291,8 @@ end
 
 local waiting = false  -- item data asked for; one repaint when it lands
 
--- the saved items as display entries, grouped by bags category
-local function Collect(list)
+-- the saved items as display entries
+local function Collect(list, query)
     local items, used, total = {}, 0, 0
     for _, t in ipairs(type(list) == "table" and list or {}) do
         if type(t) == "table" then
@@ -415,7 +350,7 @@ local function Group(items)
     return groups
 end
 
-local function Paint(b, it)
+local function PaintSlot(b, it)
     local z = BP().bagItemIconZoom or 0.08
     b.link = it.link
     b.icon:SetTexture(it.icon or 134400)
@@ -436,27 +371,30 @@ local function Paint(b, it)
     b:Show()
 end
 
-Refresh = function()
-    if not (win and win:IsShown()) then return end
+Paint = function()
+    if not (panel and panel:IsShown()) then return end
     if not Offline.Char(viewKey) then viewKey = Offline.CurrentKey() end
     local c = Offline.Char(viewKey)
-    header.who.text:SetText(c and (Hex(c.class) .. (c.name or viewKey) .. "|r") or (UnitName("player") or ""))
-    header.who:SetWidth(header.who.text:GetStringWidth() + 28)
+    bar.who.text:SetText(c and (Hex(c.class) .. (c.name or viewKey) .. "|r") or (UnitName("player") or ""))
+    bar.who:SetWidth(bar.who.text:GetStringWidth() + 28)
     PaintTabs()
 
-    local cols = Columns()
+    local width = panel:GetWidth()
+    local cols = math.max(math.floor((width - PAD * 2 - 10) / (SLOT_SIZE + SPACING)), 1)
     local gridW = cols * (SLOT_SIZE + SPACING)
-    win:SetSize(gridW + PAD * 2 + 10, Height())
-    child:SetWidth(gridW + PAD * 2)
+    child:SetWidth(math.max(width, 1))
+    local titleSize = BP().bagCatTitleSize or 11
 
     waiting = false
+    local query = Query()
     local list, saved = Containers()
-    local items, used, total = Collect(list)
+    local items, used, total = Collect(list, query)
     local y, shown, nh = -6, 0, 0
     if list then
         for _, g in ipairs(Group(items)) do
             nh = nh + 1
             local h = Head(nh)
+            SetFont(h.label, titleSize)
             h:ClearAllPoints()
             h:SetPoint("TOPLEFT", PAD + 5, y)
             h:SetWidth(gridW)
@@ -469,7 +407,7 @@ Refresh = function()
                 b:ClearAllPoints()
                 b:SetPoint("TOPLEFT", PAD + 5 + ((i - 1) % cols) * (SLOT_SIZE + SPACING),
                     y - math.floor((i - 1) / cols) * (SLOT_SIZE + SPACING))
-                Paint(b, it)
+                PaintSlot(b, it)
             end
             y = y - math.ceil(#g.items / cols) * (SLOT_SIZE + SPACING) - 6
         end
@@ -489,26 +427,28 @@ Refresh = function()
     elseif shown == 0 then
         empty = query ~= "" and EllesmereUI.L("No items match your search.") or EllesmereUI.L("No Items")
     end
-    win.empty:SetText(empty or "")
-    win.empty:SetShown(empty ~= nil)
+    panel.empty:SetText(empty or "")
+    panel.empty:SetShown(empty ~= nil)
 
-    -- footer
+    -- gold and when it was saved, right of the tabs; slots in the bags header
+    local GL = EUI.GetGoldLedger and EUI.GetGoldLedger()
     local gold
     if viewTab == "warband" then
-        local GL = EUI.GetGoldLedger and EUI.GetGoldLedger()
         gold = GL and GL.WarbandMoney()
-    else
-        local GL = EUI.GetGoldLedger and EUI.GetGoldLedger()
-        local e = GL and GL.Data().chars[viewKey]
+    elseif GL then
+        local e = GL.Data().chars[viewKey]
         gold = e and e.money
-        if viewKey == Offline.CurrentKey() and GL then gold = GL.Money() end
+        if viewKey == Offline.CurrentKey() then gold = GL.Money() end
     end
-    footer.gold:SetText(type(gold) == "number" and GetMoneyString(gold, true) or "")
     local parts = {}
-    if list then parts[#parts + 1] = used .. "/" .. total end
     local age = Age(saved)
     if age then parts[#parts + 1] = EllesmereUI.Lf("Saved %1$s", age) end
-    footer.info:SetText(table.concat(parts, "   "))
+    if type(gold) == "number" then parts[#parts + 1] = GetMoneyString(gold, true) end
+    bar.info:SetText(table.concat(parts, "    "))
+    local hdr = EUI_Bags.Header
+    if hdr and hdr.itemCount then
+        hdr.itemCount:SetText(list and EllesmereUI.Lf("%d / %d Items", used, total) or "")
+    end
 end
 
 -- item data landing, or the store changing under the open view
@@ -516,36 +456,41 @@ local repaint = false
 local function Soon()
     if repaint then return end
     repaint = true
-    C_Timer.After(0.2, function() repaint = false; Refresh() end)
+    C_Timer.After(0.2, function() repaint = false; Paint() end)
 end
 local ev = CreateFrame("Frame")
 ev:SetScript("OnEvent", function() if waiting then Soon() end end)
-Offline.OnChange(function() if win and win:IsShown() then Soon() end end)
+Offline.OnChange(function() if panel and panel:IsShown() then Soon() end end)
 
 -------------------------------------------------------------------------------
---  Opening it
+--  Hooked into the bags refresh
 -------------------------------------------------------------------------------
-function Offline.Show(tab, key)
-    if not Offline.Enabled() then return end
+-- after every bags refresh (FinishRefresh): over the item area while Bank is
+-- selected, hidden otherwise. sidebarW: the sidebar's current width.
+function ns.OfflinePanel(selected, sidebarW)
+    if not (selected and Offline.Enabled()) then
+        if panel then panel:Hide() end
+        ev:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
+        return
+    end
     Build()
-    viewTab = tab or viewTab
-    viewKey = key or viewKey or Offline.CurrentKey()
-    win:Show()
-    win:Raise()
+    panel:ClearAllPoints()
+    panel:SetPoint("TOPLEFT", EUI_Bags, "TOPLEFT", sidebarW or 0, -((EUI_Bags.Header and EUI_Bags.Header:GetHeight() or 35) + 1))
+    if EUI_Bags.Footer then
+        panel:SetPoint("BOTTOMRIGHT", EUI_Bags.Footer, "TOPRIGHT", -1, 0)
+    else
+        panel:SetPoint("BOTTOMRIGHT", EUI_Bags, "BOTTOMRIGHT", -1, 30)
+    end
+    panel:SetFrameLevel(EUI_Bags:GetFrameLevel() + 40)
+    viewKey = viewKey or Offline.CurrentKey()
+    panel:Show()
     ev:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-    Refresh()
+    Paint()
 end
 
-function Offline.Toggle(tab)
-    if win and win:IsShown() then win:Hide() else Offline.Show(tab) end
-end
-
--- the option toggled: the sidebar's Bank entry follows
+-- the option toggled: off leaves the Bank view for All Items
 function Offline.SyncButton()
-    if not Offline.Enabled() and win then win:Hide() end
-    if EUI_Bags and EUI_Bags:IsVisible() and EUI_Bags.RefreshInventory then EUI_Bags:RefreshInventory() end
+    if not (EUI_Bags and EUI_Bags.RefreshInventory) then return end
+    if not Offline.Enabled() and ns.GetSelection() == BANK_VIEW then I.SetSelectedCategoryIndex(0) end
+    if EUI_Bags:IsVisible() then EUI_Bags:RefreshInventory() end
 end
-
--- /euibank opens it too
-SLASH_EUIOFFLINEBANK1 = "/euibank"
-SlashCmdList.EUIOFFLINEBANK = function() Offline.Toggle("bank") end

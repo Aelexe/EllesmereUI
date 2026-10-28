@@ -1117,9 +1117,9 @@ local function BuildSidebarButtons(categoryCounts, totalCount)
     for _, _k in ipairs({ "all", "onebag", "multibag" }) do
         if _k ~= _dbt then displayList[#displayList + 1] = _fixedViews[_k] end
     end
-    -- Bank: opens the Offline Bank viewer, never a selection of its own
+    -- Bank: the Offline Bank view (EllesmereUIBags_OfflineView.lua)
     if FixedViewCount() == 4 then
-        displayList[#displayList + 1] = { catIdx = -3, name = EllesmereUI.L("Bank"), icon = 133784, isBankView = true }
+        displayList[#displayList + 1] = { catIdx = -3, name = EllesmereUI.L("Bank"), icon = 133784 }
     end
 
     -- Split-mode set children: rendered nested under the "Item Set Gear" anchor
@@ -1298,10 +1298,6 @@ local function BuildSidebarButtons(categoryCounts, totalCount)
                     end
                 end
                 if self._didDrag then self._didDrag = false; return end
-                if self._isBankView then
-                    if ns.Offline then ns.Offline.Toggle("bank") end
-                    return
-                end
                 if self._isGroupHeader and self._groupName then
                     SetSelectedGroupName(self._groupName)
                     SetSelectedCategoryIndex(0)
@@ -1380,7 +1376,6 @@ local function BuildSidebarButtons(categoryCounts, totalCount)
         btn._noMove = entry.noMove or false
         btn._isEquipSet = entry.isEquipSet or false
         btn._isPinned = entry.isPinned or false
-        btn._isBankView = entry.isBankView or false
 
         btn:SetParent(sidebarChild or sidebar)
         btn:ClearAllPoints()

@@ -518,6 +518,8 @@ local function FinishRefresh(curY, gridContentW, sidebarW, totalCount, numEmpty,
     -- View may have changed under a held item (catch layer on / off)
     if EUI_Bags._syncDropTarget and GetCursorInfo() == "item" then EUI_Bags._syncDropTarget() end
     ns.UpdateResizeGrip(EUI_Bags, EUI_Bags.IsListMode() and _bagListGripCfg or _bagGripCfg)
+    -- Offline Bank: its panel over the item area while Bank is selected
+    if ns.OfflinePanel then ns.OfflinePanel(selectedCategoryIndex == ns.OFFLINE_BANK_VIEW, sidebarW) end
 end
 
 function EUI_Bags:RefreshInventory()
@@ -753,7 +755,9 @@ function EUI_Bags:RefreshInventory()
     local displayItems = {}
     for _, data in ipairs(tempItems) do
         local show = true
-        if isRecentView then
+        if selectedCategoryIndex == ns.OFFLINE_BANK_VIEW then
+            show = false  -- the Offline Bank panel covers the item area
+        elseif isRecentView then
             show = data.info and data.info.itemID and EUI_Bags._recentItems and EUI_Bags._recentItems[data.info.itemID]
         elseif isPinnedView then
             show = data.info and data.info.itemID and pinnedSet and IsItemPinned(pinnedSet, data.itemLink, data.info.itemID)
