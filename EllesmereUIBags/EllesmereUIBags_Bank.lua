@@ -514,10 +514,19 @@ do
 
     -- Shared formatting
     local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:14:14:0:0|t"
+    local SILVER_ICON = "|TInterface\\MoneyFrame\\UI-SilverIcon:14:14:0:0|t"
+    local COPPER_ICON = "|TInterface\\MoneyFrame\\UI-CopperIcon:14:14:0:0|t"
+    -- gold, then silver and copper when there are any (the warbank takes both)
     local function FormatGold(copper)
         if not copper or copper == 0 then return "0" .. GOLD_ICON end
         local gold = math.floor(copper / 10000)
-        return BreakUpLargeNumbers(gold) .. GOLD_ICON
+        local silver = math.floor(copper / 100) % 100
+        local cop = copper % 100
+        local parts = {}
+        if gold > 0 then parts[#parts + 1] = BreakUpLargeNumbers(gold) .. GOLD_ICON end
+        if silver > 0 then parts[#parts + 1] = silver .. SILVER_ICON end
+        if cop > 0 then parts[#parts + 1] = cop .. COPPER_ICON end
+        return table.concat(parts, " ")
     end
 
     -- Layout: | [10px] [player gold] ... [withdraw] [deposit] [10px] [warband gold] [10px] |
