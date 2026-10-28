@@ -117,7 +117,7 @@ local function OpenPicker(owner)
             end)
         end
         local c = Offline.Char(viewKey)
-        if c and viewKey ~= Offline.CurrentKey() then
+        if c and Offline.CanForget(viewKey) then
             root:CreateDivider()
             root:CreateButton(EllesmereUI.Lf("Forget %1$s", c.name or viewKey), function()
                 Offline.Forget(viewKey)
@@ -433,7 +433,10 @@ Paint = function()
     -- gold and when it was saved, right of the tabs; slots in the bags header
     local GL = EUI.GetGoldLedger and EUI.GetGoldLedger()
     local gold
-    if viewTab == "warband" then
+    if Offline.UsingSyndicator() then
+        local src = viewTab == "warband" and Offline.Warband() or Offline.Char(viewKey)
+        gold = src and src.money
+    elseif viewTab == "warband" then
         gold = GL and GL.WarbandMoney()
     elseif GL then
         local e = GL.Data().chars[viewKey]

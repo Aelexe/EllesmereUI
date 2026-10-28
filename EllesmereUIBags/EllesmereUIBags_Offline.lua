@@ -17,6 +17,10 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  Reads only: bags are copied after BAG_UPDATE_DELAYED, the banks while a
 --  banker is open. Nothing is saved, hooked or listened to while both the
 --  Offline Bank and Tooltip Item Counts options are off.
+--
+--  Syndicator (optional): with Use Syndicator Data on, the viewer reads
+--  Syndicator's saved inventories through Syndicator.API instead, our own
+--  saving pauses, and Syndicator's tooltip counts stand in for ours.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
 local ns = select(2, ...)
@@ -28,9 +32,18 @@ local function BP() return (EUI._bagsDB and EUI._bagsDB.profile) or _emptyP end
 local Offline = {}
 ns.Offline = Offline
 
+local function SynAPI()
+    local S = _G.Syndicator
+    return type(S) == "table" and type(S.API) == "table" and S.API.GetAllCharacters and S.API or nil
+end
+function Offline.SyndicatorLoaded() return SynAPI() ~= nil end
+function Offline.UsingSyndicator() return BP().bagSyndicator == true and SynAPI() ~= nil end
+
 function Offline.Enabled() return BP().bagOfflineBank ~= false end
-function Offline.CountsEnabled() return BP().bagTooltipCounts ~= false end
-local function Active() return Offline.Enabled() or Offline.CountsEnabled() end
+function Offline.CountsEnabled() return BP().bagTooltipCounts ~= false and not Offline.UsingSyndicator() end
+local function Active()
+    return (Offline.Enabled() or Offline.CountsEnabled()) and not Offline.UsingSyndicator()
+end
 
 -------------------------------------------------------------------------------
 --  Store
@@ -50,14 +63,74 @@ function Offline.Store()
     return db
 end
 
-function Offline.CurrentKey()
+local function OwnKey()
     local name, realm = UnitName("player"), EUI.RealmGroupName()
     if not name or not realm then return nil end
     return name .. "-" .. realm
 end
 
-function Offline.Char(key) return key and Offline.Store().chars[key] end
-function Offline.Warband() return Offline.Store().warband end
+-- Syndicator's tabs ({ slots = { item... }, name, iconTexture }) in our container shape
+local function SynTabs(list)
+    if type(list) ~= "table" then return nil end
+    local tabs = {}
+    for _, tab in ipairs(list) do
+        local slots = type(tab) == "table" and tab.slots
+        if type(slots) == "table" and #slots > 0 then
+            local links, counts = {}, {}
+            for slot, item in ipairs(slots) do
+                if type(item) == "table" and item.itemLink then
+                    links[slot] = item.itemLink
+                    if (item.itemCount or 1) > 1 then counts[slot] = item.itemCount end
+                end
+            end
+            tabs[#tabs + 1] = { size = #slots, name = tab.name, icon = tab.iconTexture, links = links, counts = counts }
+        end
+    end
+    return #tabs > 0 and tabs or nil
+end
+
+-- converted entries, rebuilt after any Syndicator update
+local synCache, synRev = {}, -1
+local function SynCached(key, build)
+    if synRev ~= rev then wipe(synCache); synRev = rev end
+    local v = synCache[key]
+    if v == nil then v = build() or false; synCache[key] = v end
+    return v or nil
+end
+
+local function SynChar(key)
+    return SynCached(key, function()
+        local d = SynAPI().GetByCharacterFullName(key)
+        local det = type(d) == "table" and d.details
+        if type(det) ~= "table" then return nil end
+        return { name = det.character or key, realm = det.realm or det.realmNormalized or "",
+                 class = det.className, money = d.money, bank = SynTabs(d.bankTabs) }
+    end)
+end
+
+function Offline.CurrentKey()
+    if Offline.UsingSyndicator() then
+        local key = SynAPI().GetCurrentCharacter()
+        if key then return key end
+    end
+    return OwnKey()
+end
+
+function Offline.Char(key)
+    if not key then return nil end
+    if Offline.UsingSyndicator() then return SynChar(key) end
+    return Offline.Store().chars[key]
+end
+
+function Offline.Warband()
+    if Offline.UsingSyndicator() then
+        return SynCached("\0warband", function()
+            local w = SynAPI().GetWarband(1)
+            return { tabs = SynTabs(w and w.bank) or {}, money = w and w.money }
+        end)
+    end
+    return Offline.Store().warband
+end
 function Offline.Rev() return rev end
 
 -- something changed: the viewer and the tooltip index catch up
@@ -67,8 +140,13 @@ local function Changed(what)
 end
 function Offline.OnChange(fn) listeners[#listeners + 1] = fn end
 
+-- Syndicator's characters are removed in Syndicator itself
+function Offline.CanForget(key)
+    return key ~= nil and key ~= Offline.CurrentKey() and not Offline.UsingSyndicator()
+end
+
 function Offline.Forget(key)
-    if not key or key == Offline.CurrentKey() then return end
+    if not Offline.CanForget(key) then return end
     Offline.Store().chars[key] = nil
     Changed("forget")
 end
@@ -76,9 +154,22 @@ end
 -- characters for the picker: realm, then name; the current one flagged
 function Offline.Characters()
     local list, me = {}, Offline.CurrentKey()
-    for key, c in pairs(Offline.Store().chars) do
-        if type(c) == "table" then
-            list[#list + 1] = { key = key, name = c.name or key, realm = c.realm or "", class = c.class, current = key == me }
+    if Offline.UsingSyndicator() then
+        local API = SynAPI()
+        for _, key in ipairs(API.GetAllCharacters() or {}) do
+            local d = API.GetByCharacterFullName(key)
+            local det = type(d) == "table" and d.details
+            -- characters hidden in Syndicator stay hidden here
+            if type(det) == "table" and not (det.show and det.show.inventory == false) then
+                list[#list + 1] = { key = key, name = det.character or key, realm = det.realm or det.realmNormalized or "",
+                                    class = det.className, current = key == me }
+            end
+        end
+    else
+        for key, c in pairs(Offline.Store().chars) do
+            if type(c) == "table" then
+                list[#list + 1] = { key = key, name = c.name or key, realm = c.realm or "", class = c.class, current = key == me }
+            end
         end
     end
     table.sort(list, function(a, b)
@@ -89,7 +180,7 @@ function Offline.Characters()
 end
 
 local function MyEntry()
-    local key = Offline.CurrentKey()
+    local key = OwnKey()
     if not key then return nil end
     local chars = Offline.Store().chars
     local c = chars[key]
@@ -222,8 +313,23 @@ end)
 local EVENTS = { "BAG_UPDATE_DELAYED", "BAG_UPDATE", "PLAYER_INTERACTION_MANAGER_FRAME_SHOW",
     "PLAYER_INTERACTION_MANAGER_FRAME_HIDE", "PLAYERBANKSLOTS_CHANGED",
     "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", "BANK_TABS_CHANGED" }
+-- Syndicator's updates refresh the viewer while its data is in use
+local synHooked = false
+local function HookSyndicator()
+    if synHooked or not SynAPI() then return end
+    local reg = _G.Syndicator.CallbackRegistry
+    if not (reg and reg.RegisterCallback) then return end
+    synHooked = true
+    local function OnSyn() if Offline.UsingSyndicator() then Changed("syndicator") end end
+    for _, e in ipairs({ "BagCacheUpdate", "WarbandBankCacheUpdate", "CurrencyCacheUpdate", "CharacterDeleted", "Ready" }) do
+        reg:RegisterCallback(e, OnSyn, Offline)
+    end
+end
+
 local listening = false
 function Offline.Sync()
+    if Offline.UsingSyndicator() then HookSyndicator() end
+    rev = rev + 1  -- the source may have changed
     local on = Active()
     if on == listening then return end
     listening = on

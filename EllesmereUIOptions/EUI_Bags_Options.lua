@@ -174,12 +174,29 @@ initFrame:SetScript("OnEvent", function(self)
                           end },
                         { type="toggle", text="Tooltip Item Counts",
                           tooltip="Item tooltips list how many of that item each of your characters has in their bags and bank, plus the warband bank.",
+                          disabled = function() return Offline.UsingSyndicator() end,
+                          disabledTooltip = "Syndicator adds its own item counts to tooltips while its data is in use.",
                           getValue=function() return db.profile.bagTooltipCounts ~= false end,
                           setValue=function(v)
                               db.profile.bagTooltipCounts = v and true or false
                               Offline.Sync()
                               Offline.SyncTooltip()
                           end }
+                    ); y = y - h
+                    _, h = W:DualRow(parent, y,
+                        { type="toggle", text="Use Syndicator Data",
+                          tooltip="Bank in the bags sidebar shows the characters and banks Syndicator has saved, including characters it saw before EllesmereUI was installed. Syndicator's own tooltip counts are used while this is on.",
+                          disabled = function() return not Offline.SyndicatorLoaded() end,
+                          disabledTooltip = "Syndicator isn't installed or enabled.",
+                          getValue=function() return db.profile.bagSyndicator == true end,
+                          setValue=function(v)
+                              db.profile.bagSyndicator = v and true or false
+                              Offline.Sync()
+                              Offline.SyncTooltip()
+                              Offline.SyncButton()
+                              EllesmereUI:RefreshPage()
+                          end },
+                        EllesmereUI.BlankRowCfg()
                     ); y = y - h
                 end
 
