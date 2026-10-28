@@ -272,7 +272,7 @@ initFrame:SetScript("OnEvent", function(self)
                       ResetAndRefreshBagLayout()
                   end }
             end
-            -- Background Color / Opacity and Slot Background: bags and bank alike
+            -- background color/opacity and slot background, same for bags and bank
             local function ApplyBackgrounds()
                 local bags, bank = _G.EUI_Bags, _G.EUI_BankFrame
                 if bags then BagsNS.ApplyWindowBackground(bags.bg, bags.bgOverlay) end

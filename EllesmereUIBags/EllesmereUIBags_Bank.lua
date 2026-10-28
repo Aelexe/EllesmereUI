@@ -208,7 +208,7 @@ bgAtlas:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png")
 local bgOverlay = EUI_Bank:CreateTexture(nil, "BACKGROUND", nil, 1)
 bgOverlay:SetAllPoints()
 bgOverlay:SetColorTexture(0, 0, 0, 0.25)
-EUI_Bank._bg, EUI_Bank._bgOverlay = bgAtlas, bgOverlay  -- Background Color / Opacity
+EUI_Bank._bg, EUI_Bank._bgOverlay = bgAtlas, bgOverlay  -- background color/opacity
 EUI.MakeBorder(EUI_Bank, 1, 1, 1, 0.15, EUI.PP)
 
 -------------------------------------------------------------------------------
