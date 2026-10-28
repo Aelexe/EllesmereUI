@@ -56,8 +56,8 @@ local BAGS_DEFAULTS = {
         bagWindowLocked       = false,   -- footer lock icon: no resizing or moving
         bankWindowLocked      = false,
         bagOpenWithCharacter  = false,
-        bagOfflineBank        = true,    -- offline bank: saves bags/banks, adds bank to the bags sidebar
-        bagTooltipCounts      = true,    -- item counts in tooltips, from the same saves
+        bagOfflineBank        = false,   -- offline bank: saves bags/banks, adds bank to the bags sidebar
+        bagTooltipCounts      = false,   -- item counts in tooltips, from the same saves
         bagSyndicator         = false,   -- read syndicator's saved data instead
         -- bagFrameStrata has no default: unset reads the retired
         -- bagAllowWindowsOverBags (ns.BagFrameStrata)

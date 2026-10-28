@@ -719,6 +719,14 @@ bagsView.goldRef = function() return EUI_Bags.Money end
 -- alt is showing, hidden otherwise. sidebarW is the sidebar's width.
 function ns.OfflinePanel(sidebarW)
     local hdr = EUI_Bags.Header
+    -- off: nothing to do unless it was on earlier and needs tidying up
+    if not Offline.Enabled() then
+        if bagsView.pick or bagsView.mode then
+            SyncTitle(bagsView, hdr and hdr.title, hdr and hdr.itemCount)
+            Place(bagsView, nil)
+        end
+        return
+    end
     SyncTitle(bagsView, hdr and hdr.title, hdr and hdr.itemCount)
     local mode
     if ns.GetSelection() == BANK_VIEW and Offline.Enabled() then
@@ -874,6 +882,13 @@ if EUI_Bank then
 
     SyncBank = function()
         if not EUI_Bank:IsShown() then return end
+        if not Offline.Enabled() then
+            if bankView.pick or bankView.mode then
+                SyncTitle(bankView, EUI_Bank._headerTitle, EUI_Bank._headerItemCount)
+                Place(bankView, nil)
+            end
+            return
+        end
         SyncTitle(bankView, EUI_Bank._headerTitle, EUI_Bank._headerItemCount)
         local sf, list = EUI_Bank._scrollFrame, EUI_Bank._sidebarSF
         if not bankView.side and list then
@@ -897,7 +912,7 @@ if EUI_Bank then
     EUI_Bank:HookScript("OnShow", SyncBank)
     EUI_Bank:HookScript("OnHide", function()
         bankView.key, bankView.viewTab = nil, "bank"
-        Place(bankView, nil)
+        if bankView.mode then Place(bankView, nil) end
     end)
     -- the live bank keeps resetting the slot count while an alt's showing
     if EUI_Bank._headerItemCount then

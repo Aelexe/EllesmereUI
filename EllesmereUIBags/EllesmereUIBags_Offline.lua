@@ -34,10 +34,10 @@ local function SynAPI()
     return type(S) == "table" and type(S.API) == "table" and S.API.GetAllCharacters and S.API or nil
 end
 function Offline.SyndicatorLoaded() return SynAPI() ~= nil end
-function Offline.UsingSyndicator() return BP().bagSyndicator == true and SynAPI() ~= nil end
+function Offline.UsingSyndicator() return BP().bagOfflineBank == true and BP().bagSyndicator == true and SynAPI() ~= nil end
 
-function Offline.Enabled() return BP().bagOfflineBank ~= false end
-function Offline.CountsEnabled() return BP().bagTooltipCounts ~= false and not Offline.UsingSyndicator() end
+function Offline.Enabled() return BP().bagOfflineBank == true end
+function Offline.CountsEnabled() return BP().bagTooltipCounts == true and not Offline.UsingSyndicator() end
 local function Active()
     return (Offline.Enabled() or Offline.CountsEnabled()) and not Offline.UsingSyndicator()
 end

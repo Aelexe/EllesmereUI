@@ -165,18 +165,19 @@ initFrame:SetScript("OnEvent", function(self)
                     _, h = W:SectionHeader(parent, "OFFLINE BANK", y); y = y - h
                     _, h = W:DualRow(parent, y,
                         { type="toggle", text="Offline Bank",
-                          tooltip="Saves each character's bags and bank, and the warband bank, when you see them. Click the name in the bags title to see another character's bags, and Bank in the bags sidebar for their bank or the warband bank, from anywhere.",
-                          getValue=function() return db.profile.bagOfflineBank ~= false end,
+                          tooltip="Saves each character's bags and bank, and the warband bank, when you see them. Use the person button by the bags or bank title to see another character's bags or bank, and Bank in the bags sidebar for their bank or the warband bank, from anywhere.",
+                          getValue=function() return db.profile.bagOfflineBank == true end,
                           setValue=function(v)
                               db.profile.bagOfflineBank = v and true or false
                               Offline.Sync()
                               Offline.SyncButton()
+                              EllesmereUI:RefreshPage()
                           end },
                         { type="toggle", text="Tooltip Item Counts",
                           tooltip="Item tooltips list how many of that item each of your characters has in their bags and bank, plus the warband bank.",
                           disabled = function() return Offline.UsingSyndicator() end,
                           disabledTooltip = "Syndicator adds its own item counts to tooltips while its data is in use.",
-                          getValue=function() return db.profile.bagTooltipCounts ~= false end,
+                          getValue=function() return db.profile.bagTooltipCounts == true end,
                           setValue=function(v)
                               db.profile.bagTooltipCounts = v and true or false
                               Offline.Sync()
@@ -186,8 +187,11 @@ initFrame:SetScript("OnEvent", function(self)
                     _, h = W:DualRow(parent, y,
                         { type="toggle", text="Use Syndicator Data",
                           tooltip="Bank in the bags sidebar shows the characters and banks Syndicator has saved, including characters it saw before EllesmereUI was installed. Syndicator's own tooltip counts are used while this is on.",
-                          disabled = function() return not Offline.SyndicatorLoaded() end,
-                          disabledTooltip = "Syndicator isn't installed or enabled.",
+                          disabled = function() return not Offline.SyndicatorLoaded() or db.profile.bagOfflineBank ~= true end,
+                          disabledTooltip = function()
+                              if not Offline.SyndicatorLoaded() then return "Syndicator isn't installed or enabled." end
+                              return "Turn on Offline Bank first."
+                          end,
                           getValue=function() return db.profile.bagSyndicator == true end,
                           setValue=function(v)
                               db.profile.bagSyndicator = v and true or false
