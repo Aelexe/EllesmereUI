@@ -313,6 +313,46 @@ initFrame:SetScript("OnEvent", function(self)
                       ResetAndRefreshBagLayout()
                   end }
             end
+            -- Background Color / Opacity and Slot Background: bags and bank alike
+            local function ApplyBackgrounds()
+                local bags, bank = _G.EUI_Bags, _G.EUI_BankFrame
+                if bags then BagsNS.ApplyWindowBackground(bags.bg, bags.bgOverlay) end
+                if bank then BagsNS.ApplyWindowBackground(bank._bg, bank._bgOverlay) end
+            end
+            local function RefreshWindows()
+                if _G.EUI_Bags and _G.EUI_Bags:IsVisible() and _G.EUI_Bags.RefreshInventory then _G.EUI_Bags:RefreshInventory() end
+                local bank = _G.EUI_BankFrame
+                if bank and bank:IsVisible() and bank.RefreshBank then bank:RefreshBank() end
+            end
+            layoutSlots[#layoutSlots + 1] = { type="colorpicker", text="Background Color", hasAlpha=true,
+                tooltip="The tint over the bag and bank window backgrounds. Its opacity sets how strong the tint is.",
+                getValue=function()
+                    local c = db.profile.bagBgColor
+                    if c then return c.r, c.g, c.b, c.a or 0.25 end
+                    return 0, 0, 0, 0.25
+                end,
+                setValue=function(r, g, b, a)
+                    db.profile.bagBgColor = { r = r, g = g, b = b, a = a }
+                    ApplyBackgrounds()
+                end }
+            layoutSlots[#layoutSlots + 1] = { type="slider", text="Background Opacity", min=0, max=100, step=5,
+                tooltip="How see-through the bag and bank window backgrounds are. Items, the header and the sidebar stay as they are.",
+                getValue=function() return db.profile.bagBgOpacity or 100 end,
+                setValue=function(v)
+                    db.profile.bagBgOpacity = v
+                    ApplyBackgrounds()
+                end }
+            layoutSlots[#layoutSlots + 1] = { type="colorpicker", text="Slot Background", hasAlpha=true,
+                tooltip="The color and opacity of empty item slots in the bags and bank.",
+                getValue=function()
+                    local c = db.profile.bagSlotBgColor
+                    if c then return c.r, c.g, c.b, c.a or 1 end
+                    return 1, 1, 1, 1
+                end,
+                setValue=function(r, g, b, a)
+                    db.profile.bagSlotBgColor = { r = r, g = g, b = b, a = a }
+                    RefreshWindows()
+                end }
             for i = 1, #layoutSlots, 2 do
                 _, h = W:DualRow(parent, y, layoutSlots[i], layoutSlots[i + 1] or EllesmereUI.BlankRowCfg()); y = y - h
             end

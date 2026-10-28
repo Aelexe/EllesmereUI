@@ -8,9 +8,11 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --      sidebar (the selection -3, EUI_Bags_Sidebar.lua) shows the picked
 --      character's bank, or the warband bank.
 --    * bank window: the title reads "Name's Bank" with the same list;
---      picking another character shows their saved bank over the live one.
+--      picking another character shows their saved bank over the live one,
+--      their tabs listed in place of the live sidebar's.
 --
---  Each view is a panel over its window's item area (bags: FinishRefresh in
+--  Each view is a see-through panel over its window's item area, which fades
+--  out underneath (alpha only: the secure item buttons stay put; bags: FinishRefresh in
 --  EUI_Bags_Refresh.lua calls ns.OfflinePanel after every refresh and paints
 --  no items under it; bank: after EUI_Bank:RefreshBank). Its item buttons are
 --  plain display buttons: they never touch a real bag slot, so the views are
@@ -64,6 +66,12 @@ local moneyN = 0
 
 local function ShownKey(v) return v.key or Offline.CurrentKey() end
 
+-- v.viewTab: "bank" | "warband" (all tabs) or "bank:2" | "warband:1" (one tab)
+local function TabKind(v)
+    local kind, i = v.viewTab:match("^(%a+):?(%d*)$")
+    return kind or "bank", tonumber(i)
+end
+
 -- drop a pick that no longer resolves (option off, forgotten, source changed)
 local function AltKey(v)
     if not v.key then return nil end
@@ -83,7 +91,7 @@ local function Query(v)
     return box and (box:GetText() or ""):lower() or ""
 end
 
-local Paint, SyncBank  -- forward
+local Paint, PaintSide, SyncBank  -- forward
 
 local function Repaint(v)
     if v.scroll then v.scroll:SetVerticalScroll(0) end
@@ -197,12 +205,14 @@ end
 local function PaintTabs(v)
     local r, g, b = 0.05, 0.82, 0.62
     if EUI.GetAccentColor then r, g, b = EUI.GetAccentColor() end
+    local kind = TabKind(v)
     for _, t in ipairs(v.tabs) do
-        local on = t.key == v.viewTab
+        local on = t.key == kind
         t.text:SetTextColor(on and 1 or 0.6, on and 1 or 0.6, on and 1 or 0.6)
         t.line:SetColorTexture(r, g, b, 1)
         t.line:SetShown(on)
-        t:SetShown(v.mode == "bank")
+        -- the bank window lists the tabs in its sidebar instead
+        t:SetShown(v.mode == "bank" and not v.side)
     end
 end
 
@@ -214,12 +224,6 @@ local function Build(v)
     panel:SetFrameLevel(win:GetFrameLevel() + 40)
     panel:EnableMouse(true)
     panel:Hide()
-    local bg = panel:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png")
-    local shade = panel:CreateTexture(nil, "BACKGROUND", nil, 1)
-    shade:SetAllPoints()
-    shade:SetColorTexture(0, 0, 0, 0.25)
     v.panel = panel
 
     local bar = CreateFrame("Frame", nil, panel)
@@ -352,14 +356,23 @@ end
 -------------------------------------------------------------------------------
 -- the containers behind the view, and when they were saved
 local function Containers(v)
-    if v.mode == "bank" and v.viewTab == "warband" then
+    local list, saved
+    local kind, i = TabKind(v)
+    if v.mode == "bank" and kind == "warband" then
         local w = Offline.Warband()
-        return w.tabs, w.time
+        list, saved = w.tabs, w.time
+    else
+        local c = Offline.Char(ShownKey(v))
+        if not c then return nil end
+        if v.mode == "bags" then return c.bags, c.bagsTime end
+        list, saved = c.bank, c.bankTime
     end
-    local c = Offline.Char(ShownKey(v))
-    if not c then return nil end
-    if v.mode == "bags" then return c.bags, c.bagsTime end
-    return c.bank, c.bankTime
+    -- one tab picked in the bank window's sidebar
+    if i and v.mode == "bank" and type(list) == "table" then
+        if not list[i] then return list, saved end
+        return { list[i] }, saved
+    end
+    return list, saved
 end
 
 local waiting = false  -- item data asked for; one repaint when it lands
@@ -550,7 +563,7 @@ Paint = function(v)
     if not list then
         if v.mode == "bags" then
             empty = EllesmereUI.L("This character's bags haven't been saved yet. Log in on this character once.")
-        elseif v.viewTab == "warband" then
+        elseif TabKind(v) == "warband" then
             empty = EllesmereUI.L("The warband bank hasn't been saved yet. Open it once at a banker.")
         else
             empty = EllesmereUI.L("This character's bank hasn't been saved yet. Visit a banker on this character.")
@@ -563,7 +576,7 @@ Paint = function(v)
 
     -- saved time and gold on the bar; slots in the window header
     local key = ShownKey(v)
-    local warband = v.mode == "bank" and v.viewTab == "warband"
+    local warband = v.mode == "bank" and TabKind(v) == "warband"
     local GL = EUI.GetGoldLedger and EUI.GetGoldLedger()
     local gold
     if Offline.UsingSyndicator() then
@@ -587,6 +600,7 @@ Paint = function(v)
         text = EllesmereUI.Lf("%d / %d Items", used, total)
     end
     v.countText = text
+    if v.side then PaintSide(v) end
     local count = v.count and v.count()
     if count then
         v.painting = true
@@ -624,9 +638,18 @@ Offline.OnChange(function()
     for _, v in ipairs(views) do if v.panel and v.panel:IsShown() then Soon(v) end end
 end)
 
+-- the window's own content under the panel: faded out, never hidden or moved
+local function Cover(v, on)
+    if v.covered == on then return end
+    v.covered = on
+    for _, f in pairs(v.under and v.under() or {}) do f:SetAlpha(on and 0 or 1) end
+end
+
 -- show the panel over a window's item area, or hide it
 local function Place(v, mode, left, top, bottom)
     v.mode = mode
+    Cover(v, mode ~= nil)
+    if v.side then v.side:SetShown(mode ~= nil) end
     if not mode then
         if v.panel then v.panel:Hide() end
         SyncEvents()
@@ -647,6 +670,7 @@ end
 --  Bags: hooked into the bags refresh
 -------------------------------------------------------------------------------
 bagsView.count = function() return EUI_Bags.Header and EUI_Bags.Header.itemCount end
+bagsView.under = function() return { EUI_Bags._scrollFrame, EUI_Bags._scrollTrack } end
 bagsView.goldRef = function() return EUI_Bags.Money end
 
 -- after every bags refresh (FinishRefresh): over the item area while Bank is
@@ -673,21 +697,139 @@ local EUI_Bank = bankView.win
 if EUI_Bank then
     bankView.count = function() return EUI_Bank._headerItemCount end
     bankView.goldRef = function() return EUI_Bank._warbandGoldText end
+    bankView.under = function() return { EUI_Bank._scrollFrame, EUI_Bank._scrollTrack, EUI_Bank._sidebarSF } end
+
+    -- the picked character's tabs, over the live sidebar's list (its header and
+    -- collapse arrow stay live), styled like the live entries
+    local ROW_H, ROW_PAD, ICON = 26, 2, 18
+    local rows = {}
+    local function Row(i)
+        if rows[i] then return rows[i] end
+        local b = CreateFrame("Button", nil, bankView.side)
+        b:SetHeight(ROW_H)
+        local px = (EUI.PP and EUI.PP.mult) or 1
+        b.ind = b:CreateTexture(nil, "OVERLAY")
+        b.ind:SetWidth(px * 2)
+        b.ind:SetPoint("TOPLEFT")
+        b.ind:SetPoint("BOTTOMLEFT")
+        b.bg = b:CreateTexture(nil, "BACKGROUND", nil, 2)
+        b.bg:SetAllPoints()
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetSize(ICON, ICON)
+        b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        b.label = b:CreateFontString(nil, "OVERLAY")
+        SetFont(b.label, 11)
+        b.label:SetJustifyH("LEFT")
+        b.label:SetWordWrap(false)
+        b.label:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
+        b.label:SetPoint("RIGHT", b, "RIGHT", -30, 0)
+        b.count = b:CreateFontString(nil, "OVERLAY")
+        SetFont(b.count, 10)
+        b.count:SetJustifyH("RIGHT")
+        b.count:SetTextColor(0.5, 0.5, 0.5)
+        b.count:SetPoint("RIGHT", -6, 0)
+        b:SetScript("OnClick", function(self)
+            bankView.viewTab = self.key
+            Repaint(bankView)
+        end)
+        b:SetScript("OnEnter", function(self)
+            if not self.on then self.bg:SetColorTexture(1, 1, 1, 0.06) end
+            if BP().bankSidebarCollapsed then EUI.ShowWidgetTooltip(self, self.name .. " (" .. self.n .. ")") end
+        end)
+        b:SetScript("OnLeave", function(self)
+            if not self.on then self.bg:SetColorTexture(1, 1, 1, 0) end
+            EUI.HideWidgetTooltip()
+        end)
+        rows[i] = b
+        return b
+    end
+
+    local function Used(t)
+        local n = 0
+        for _ in pairs(type(t) == "table" and type(t.links) == "table" and t.links or {}) do n = n + 1 end
+        return n
+    end
+
+    PaintSide = function(v)
+        local side = v.side
+        local c = Offline.Char(ShownKey(v))
+        local entries = {}
+        local function Add(kind, all, allIcon, tabs)
+            local total = 0
+            for _, t in ipairs(tabs or {}) do total = total + Used(t) end
+            entries[#entries + 1] = { key = kind, name = all, icon = allIcon, n = total }
+            for i, t in ipairs(tabs or {}) do
+                if type(t) == "table" then
+                    entries[#entries + 1] = { key = kind .. ":" .. i, name = (t.name and t.name ~= "") and t.name or EllesmereUI.Lf("Tab %1$d", i),
+                                              icon = t.icon or allIcon, n = Used(t) }
+                end
+            end
+        end
+        Add("bank", EllesmereUI.L("All Bank Tabs"), 413587, c and c.bank)
+        Add("warband", EllesmereUI.L("All Warbank Tabs"), 1542854, Offline.Warband().tabs)
+
+        local collapsed = BP().bankSidebarCollapsed
+        local w = side:GetWidth()
+        local r, g, b = 0.05, 0.82, 0.62
+        if EUI.GetAccentColor then r, g, b = EUI.GetAccentColor() end
+        local y = 0
+        for i, e in ipairs(entries) do
+            local row = Row(i)
+            row.key, row.name, row.n = e.key, e.name, e.n
+            row.on = e.key == v.viewTab
+            -- a gap before the warband entries, like the live sidebar's groups
+            if i > 1 and e.key == "warband" then y = y - 8 end
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", side, "TOPLEFT", 0, y)
+            row:SetWidth(w)
+            row.icon:ClearAllPoints()
+            if collapsed then
+                row.icon:SetPoint("CENTER")
+            else
+                row.icon:SetPoint("LEFT", 8 + (e.key:find(":") and 10 or 0), 0)
+            end
+            row.icon:SetTexture(EllesmereUI.ClientIcon and EllesmereUI.ClientIcon(e.icon) or e.icon)
+            row.icon:SetAlpha(row.on and 1 or 0.75)
+            row.label:SetShown(not collapsed)
+            row.count:SetShown(not collapsed)
+            row.label:SetText(e.name)
+            row.label:SetTextColor(1, 1, 1, row.on and 1 or 0.75)
+            row.count:SetText(e.n)
+            row.ind:SetColorTexture(r, g, b, 1)
+            row.ind:SetShown(row.on)
+            row.bg:SetColorTexture(r, g, b, row.on and 0.1 or 0)
+            if not row.on then row.bg:SetColorTexture(1, 1, 1, 0) end
+            row:Show()
+            y = y - ROW_H - ROW_PAD
+        end
+        for i = #entries + 1, #rows do rows[i]:Hide() end
+    end
 
     SyncBank = function()
         if not EUI_Bank:IsShown() then return end
         SyncTitle(bankView, EUI_Bank._headerTitle, EUI_Bank._headerItemCount)
-        -- between the window's header and footer, sidebar included
-        local sf = EUI_Bank._scrollFrame
-        local _, _, _, _, top = sf:GetPoint(1)
+        local sf, list = EUI_Bank._scrollFrame, EUI_Bank._sidebarSF
+        if not bankView.side and list then
+            bankView.side = CreateFrame("Frame", nil, EUI_Bank)
+            bankView.side:EnableMouse(true)
+            bankView.side:Hide()
+        end
+        if bankView.side then
+            bankView.side:ClearAllPoints()
+            bankView.side:SetPoint("TOPLEFT", list, "TOPLEFT")
+            bankView.side:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT")
+            bankView.side:SetFrameLevel(EUI_Bank:GetFrameLevel() + 40)
+        end
+        -- between the window's header and footer, right of the sidebar
+        local _, _, _, left, top = sf:GetPoint(1)
         local _, _, _, _, bottom = sf:GetPoint(2)
-        Place(bankView, AltKey(bankView) and "bank" or nil, 1, -(top or -30) + 1, bottom or 30)
+        Place(bankView, AltKey(bankView) and "bank" or nil, left or 0, -(top or -30) + 1, bottom or 30)
     end
 
     if EUI_Bank.RefreshBank then hooksecurefunc(EUI_Bank, "RefreshBank", SyncBank) end
     EUI_Bank:HookScript("OnShow", SyncBank)
     EUI_Bank:HookScript("OnHide", function()
-        bankView.key = nil
+        bankView.key, bankView.viewTab = nil, "bank"
         Place(bankView, nil)
     end)
     -- the live bank resets the slot count while another character's shows
