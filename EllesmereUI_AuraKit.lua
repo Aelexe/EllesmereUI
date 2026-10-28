@@ -87,7 +87,7 @@ local function BuildRuleDurationFormatter(withSecondsUnit, preciseThreshold)
     -- (The original nested step/rounding inside components -- silently
     -- rejected or default-rounded depending on validation strictness.)
     local points = {
-        { threshold = 0,     format = withSecondsUnit and "%ds" or "%d",  step = 1, rounding = Up },
+        { threshold = 0,     format = withSecondsUnit and "%ds" or "%d",  step = 1, rounding = Down },
         -- Minute-boundary catcher (field report: text flashed "0" just under a minute).
         -- Seconds round UP, so a raw value in (59, 60) can reach 60 and land at this
         -- threshold; the old Down bucket here floored the raw back to 0 -> "0m" for a
@@ -95,10 +95,9 @@ local function BuildRuleDurationFormatter(withSecondsUnit, preciseThreshold)
         -- resumes at 61, so every later reading keeps the legacy floored text unchanged
         -- ("1m" until 120, "59m" until the hour). Down never rounds ACROSS a threshold,
         -- so no other unit boundary has this collision.
-        { threshold = 60,    format = "%dm", step = 1, rounding = Up,   components = { { div = 60 } } },
-        { threshold = 61,    format = "%dm", step = 1, rounding = Down, components = { { div = 60 } } },
-        { threshold = 3600,  format = "%dh", step = 1, rounding = Down, components = { { div = 3600 } } },
-        { threshold = 86400, format = "%dd", step = 1, rounding = Down, components = { { div = 86400 } } },
+        { threshold = 60,    format = "%dm", step = 60,    rounding = Up,  components = { { div = 60 } } },
+        { threshold = 3600,  format = "%dh", step = 3600,  rounding = Up,  components = { { div = 3600 } } },
+        { threshold = 86400, format = "%dd", step = 86400, rounding = Up,  components = { { div = 86400 } } },
     }
     -- > 60, not > 0: with the threshold at exactly one minute the m:ss band is
     -- empty and the table would carry duplicate 60-thresholds -- the standard
@@ -110,14 +109,14 @@ local function BuildRuleDurationFormatter(withSecondsUnit, preciseThreshold)
         -- catcher mirrors the stock table's: seconds round UP, so a raw value
         -- in (59, 60) reaches 60 and must land as exactly 1:00, not wrap.
         points = {
-            { threshold = 0, format = withSecondsUnit and "%ds" or "%d", step = 1, rounding = Up },
+            { threshold = 0, format = withSecondsUnit and "%ds" or "%d", step = 1, rounding = Down },
             { threshold = 60, format = "%d:%02d", step = 1, rounding = Up,
                 components = { { div = 60 }, { mod = 60 } } },
-            { threshold = preciseThreshold, format = "%dm", step = 1, rounding = Down,
+            { threshold = preciseThreshold, format = "%dm", step = 60, rounding = Up,
                 components = { { div = 60 } } },
-            { threshold = 3600, format = "%dh", step = 1, rounding = Down,
+            { threshold = 3600, format = "%dh", step = 3600, rounding = Up,
                 components = { { div = 3600 } } },
-            { threshold = 86400, format = "%dd", step = 1, rounding = Down,
+            { threshold = 86400, format = "%dd", step = 86400, rounding = Up,
                 components = { { div = 86400 } } },
         }
     end
