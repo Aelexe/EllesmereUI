@@ -935,8 +935,8 @@ end
 --          only. validate(text) runs on a confirm: a message it returns shows in red under
 --          the input and keeps the popup open. checkbox (a label) adds a box above the
 --          buttons, unchecked on each show; onConfirm then receives its state second.
---          money swaps the text for gold / silver / copper boxes; onConfirm then
---          receives the total in copper.
+--          money swaps the text box for gold/silver/copper boxes, onConfirm
+--          then gets the total in copper.
 -------------------------------------------------------------------------------
 local MONEY_ICONS = {
     "Interface\\MoneyFrame\\UI-GoldIcon",
@@ -944,8 +944,8 @@ local MONEY_ICONS = {
     "Interface\\MoneyFrame\\UI-CopperIcon",
 }
 
--- opts.money: three number boxes, each with its coin, inside the input frame
--- (built on first use). Tab / Shift-Tab step between them.
+-- opts.money: three number boxes with coin icons in the input frame (built on
+-- first use). tab / shift-tab jumps between them.
 local function BuildMoneyRow(popup)
     if popup._moneyRow then return end
     local row = CreateFrame("Frame", nil, popup._inputFrame)
@@ -1252,7 +1252,7 @@ function EllesmereUI:ShowInputPopup(opts)
         -- keypress (RequestReload); the popup closes only while it still shows
         -- the same request (the callback may have opened the next one).
         popup._tryConfirm = function()
-            -- money boxes: the total in copper, more than nothing
+            -- money boxes: total in copper, has to be more than zero
             if popup._money then
                 local copper = popup._moneyValue()
                 if copper <= 0 then popup._flashEmpty(); return end

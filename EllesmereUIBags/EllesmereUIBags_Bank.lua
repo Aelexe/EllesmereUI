@@ -516,7 +516,7 @@ do
     local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:14:14:0:0|t"
     local SILVER_ICON = "|TInterface\\MoneyFrame\\UI-SilverIcon:14:14:0:0|t"
     local COPPER_ICON = "|TInterface\\MoneyFrame\\UI-CopperIcon:14:14:0:0|t"
-    -- gold, then silver and copper when there are any (the warbank takes both)
+    -- gold, plus silver and copper if there's any (the warbank takes both)
     local function FormatGold(copper)
         if not copper or copper == 0 then return "0" .. GOLD_ICON end
         local gold = math.floor(copper / 10000)
@@ -612,7 +612,7 @@ do
         EUI:ShowInputPopup({
             title = EllesmereUI.L(title),
             message = EllesmereUI.L("Enter an amount:"),
-            money = true,  -- gold / silver / copper boxes; onConfirm gets copper
+            money = true,  -- gold/silver/copper boxes, onConfirm gets copper
             confirmText = ACCEPT,
             cancelText = CANCEL,
             modernBlizz = true,
