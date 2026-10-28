@@ -9,54 +9,86 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --    chars[key] = { name, realm, class, level, bagsTime, bankTime,
 --                   bags = { container... }, bank = { container... } }
 --    warband    = { time, tabs = { container... } }
---    container  = { size, name?, icon?, links = { [slot] = link },
+--    container  = { size, name?, icon?, items = { [slot] = item string },
 --                   counts = { [slot] = count } } (counts only above 1)
+--  bags[i] is bag i - 1 (false when that bag slot's empty), bank[i] and
+--  tabs[i] are the i-th bank tab. pets and keystones keep their full link,
+--  since their string alone can't name them.
 --  key = "Name-Realm" (EllesmereUI.RealmGroupName), same as the gold ledger.
 --
---  read only: bags save after BAG_UPDATE_DELAYED, banks while a banker's
---  open. nothing gets saved, hooked or listened to while both options are off.
---
---  syndicator (optional): with it on we read Syndicator.API instead, stop
---  saving our own copies, and let syndicator handle tooltip counts.
+--  both switches are account-wide (EllesmereUIDB.bagOfflineBank /
+--  .bagTooltipCounts), like the data. read only: a bag saves after
+--  BAG_UPDATE_DELAYED when it changed, banks while a banker's open. nothing
+--  gets saved, hooked or listened to while both are off.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
 local ns = select(2, ...)
 if EUI.IS_FOREVER then return end  -- retail bank tabs only
 
 local _emptyP = {}
-local function BP() return (EUI._bagsDB and EUI._bagsDB.profile) or _emptyP end
+local function Acct() return _G.EllesmereUIDB or _emptyP end
 
 local Offline = {}
 ns.Offline = Offline
 
-local function SynAPI()
-    local S = _G.Syndicator
-    return type(S) == "table" and type(S.API) == "table" and S.API.GetAllCharacters and S.API or nil
-end
-function Offline.SyndicatorLoaded() return SynAPI() ~= nil end
-function Offline.UsingSyndicator() return BP().bagOfflineBank == true and BP().bagSyndicator == true and SynAPI() ~= nil end
+function Offline.Enabled() return Acct().bagOfflineBank == true end
+function Offline.CountsEnabled() return Acct().bagTooltipCounts == true end
+local function Active() return Offline.Enabled() or Offline.CountsEnabled() end
 
-function Offline.Enabled() return BP().bagOfflineBank == true end
-function Offline.CountsEnabled() return BP().bagTooltipCounts == true and not Offline.UsingSyndicator() end
-local function Active()
-    return (Offline.Enabled() or Offline.CountsEnabled()) and not Offline.UsingSyndicator()
+-------------------------------------------------------------------------------
+--  item strings
+-------------------------------------------------------------------------------
+-- "item:..." for items, the whole link for anything else
+local function ItemString(link)
+    local s = link:match("|H(item:[^|]+)|h")
+    return s or link
 end
+Offline.ItemString = ItemString
+
+-- item id from a string or link (pet cages count as the cage item)
+local function ItemID(s)
+    local kind, id = s:match("^(%a+):(%d+)")
+    if not kind then kind, id = s:match("|H(%a+):(%d+)") end
+    if kind == "battlepet" then return 82800 end
+    return tonumber(id)
+end
+Offline.ItemID = ItemID
 
 -------------------------------------------------------------------------------
 --  store
 -------------------------------------------------------------------------------
 local rev = 0          -- goes up on every write so the tooltip index knows to rebuild
 local listeners = {}
+local index, indexRev  -- tooltip index, below
+
+-- saves from before item strings kept whole colored links
+local function Upgrade(list)
+    if type(list) ~= "table" then return end
+    for _, t in ipairs(list) do
+        if type(t) == "table" and type(t.links) == "table" then
+            local items = {}
+            for slot, link in pairs(t.links) do items[slot] = ItemString(link) end
+            t.items, t.links = items, nil
+        end
+    end
+end
 
 function Offline.Store()
     local db = _G.EllesmereUIBagsInventoryDB
     if type(db) ~= "table" then
-        db = {}
+        db = { v = 2 }
         _G.EllesmereUIBagsInventoryDB = db
     end
     if type(db.chars) ~= "table" then db.chars = {} end
     if type(db.warband) ~= "table" then db.warband = { tabs = {} } end
     if type(db.warband.tabs) ~= "table" then db.warband.tabs = {} end
+    if db.v ~= 2 then
+        for _, c in pairs(db.chars) do
+            if type(c) == "table" then Upgrade(c.bags); Upgrade(c.bank) end
+        end
+        Upgrade(db.warband.tabs)
+        db.v = 2
+    end
     return db
 end
 
@@ -65,84 +97,27 @@ local function OwnKey()
     if not name or not realm then return nil end
     return name .. "-" .. realm
 end
-
--- turns syndicator's tabs ({ slots, name, iconTexture }) into our container shape
-local function SynTabs(list)
-    if type(list) ~= "table" then return nil end
-    local tabs = {}
-    for _, tab in ipairs(list) do
-        local slots = type(tab) == "table" and tab.slots
-        if type(slots) == "table" and #slots > 0 then
-            local links, counts = {}, {}
-            for slot, item in ipairs(slots) do
-                if type(item) == "table" and item.itemLink then
-                    links[slot] = item.itemLink
-                    if (item.itemCount or 1) > 1 then counts[slot] = item.itemCount end
-                end
-            end
-            tabs[#tabs + 1] = { size = #slots, name = tab.name, icon = tab.iconTexture, links = links, counts = counts }
-        end
-    end
-    return #tabs > 0 and tabs or nil
-end
-
--- converted copies, rebuilt whenever syndicator updates
-local synCache, synRev = {}, -1
-local function SynCached(key, build)
-    if synRev ~= rev then wipe(synCache); synRev = rev end
-    local v = synCache[key]
-    if v == nil then v = build() or false; synCache[key] = v end
-    return v or nil
-end
-
-local function SynChar(key)
-    return SynCached(key, function()
-        local d = SynAPI().GetByCharacterFullName(key)
-        local det = type(d) == "table" and d.details
-        if type(det) ~= "table" then return nil end
-        -- its bags are just slot lists, so wrap them like tabs
-        local bags = {}
-        for _, slots in ipairs(type(d.bags) == "table" and d.bags or {}) do bags[#bags + 1] = { slots = slots } end
-        return { name = det.character or key, realm = det.realm or det.realmNormalized or "",
-                 class = det.className, money = d.money, bags = SynTabs(bags), bank = SynTabs(d.bankTabs) }
-    end)
-end
-
-function Offline.CurrentKey()
-    if Offline.UsingSyndicator() then
-        local key = SynAPI().GetCurrentCharacter()
-        if key then return key end
-    end
-    return OwnKey()
-end
+Offline.CurrentKey = OwnKey
 
 function Offline.Char(key)
     if not key then return nil end
-    if Offline.UsingSyndicator() then return SynChar(key) end
     return Offline.Store().chars[key]
 end
-
-function Offline.Warband()
-    if Offline.UsingSyndicator() then
-        return SynCached("\0warband", function()
-            local w = SynAPI().GetWarband(1)
-            return { tabs = SynTabs(w and w.bank) or {}, money = w and w.money }
-        end)
-    end
-    return Offline.Store().warband
-end
+function Offline.Warband() return Offline.Store().warband end
 function Offline.Rev() return rev end
 
--- something changed, so the viewer and tooltip index catch up
-local function Changed(what)
+-- something changed, so the viewer and tooltip index catch up. patched: the
+-- index was already fixed up in place for this write
+local function Changed(what, patched)
+    local current = patched and index and indexRev == rev
     rev = rev + 1
+    if current then indexRev = rev end
     for _, fn in ipairs(listeners) do fn(what) end
 end
 function Offline.OnChange(fn) listeners[#listeners + 1] = fn end
 
--- syndicator's characters get removed in syndicator
 function Offline.CanForget(key)
-    return key ~= nil and key ~= Offline.CurrentKey() and not Offline.UsingSyndicator()
+    return key ~= nil and key ~= OwnKey()
 end
 
 function Offline.Forget(key)
@@ -153,23 +128,10 @@ end
 
 -- characters for the picker, by realm then name, current one flagged
 function Offline.Characters()
-    local list, me = {}, Offline.CurrentKey()
-    if Offline.UsingSyndicator() then
-        local API = SynAPI()
-        for _, key in ipairs(API.GetAllCharacters() or {}) do
-            local d = API.GetByCharacterFullName(key)
-            local det = type(d) == "table" and d.details
-            -- anyone hidden in syndicator stays hidden here
-            if type(det) == "table" and not (det.show and det.show.inventory == false) then
-                list[#list + 1] = { key = key, name = det.character or key, realm = det.realm or det.realmNormalized or "",
-                                    class = det.className, current = key == me }
-            end
-        end
-    else
-        for key, c in pairs(Offline.Store().chars) do
-            if type(c) == "table" then
-                list[#list + 1] = { key = key, name = c.name or key, realm = c.realm or "", class = c.class, current = key == me }
-            end
+    local list, me = {}, OwnKey()
+    for key, c in pairs(Offline.Store().chars) do
+        if type(c) == "table" then
+            list[#list + 1] = { key = key, name = c.name or key, realm = c.realm or "", class = c.class, current = key == me }
         end
     end
     table.sort(list, function(a, b)
@@ -194,39 +156,35 @@ end
 local function ReadContainer(bagID)
     local size = C_Container.GetContainerNumSlots(bagID) or 0
     if size <= 0 then return nil end
-    local links, counts = {}, {}
+    local items, counts = {}, {}
     for slot = 1, size do
         local info = C_Container.GetContainerItemInfo(bagID, slot)
         local link = info and (info.hyperlink or C_Container.GetContainerItemLink(bagID, slot))
         if link then
-            links[slot] = link
+            items[slot] = ItemString(link)
             if (info.stackCount or 1) > 1 then counts[slot] = info.stackCount end
         end
     end
-    return { size = size, links = links, counts = counts }
+    return { size = size, items = items, counts = counts }
 end
 
--- true when two saved container lists hold the same items
+-- true when two saved containers hold the same items
 local function SameMap(a, b)
     for k, v in pairs(a) do if b[k] ~= v then return false end end
     for k in pairs(b) do if a[k] == nil then return false end end
     return true
 end
-local function SameList(a, b)
-    if type(a) ~= "table" or type(b) ~= "table" or #a ~= #b then return false end
-    for i = 1, #a do
-        local x, y = a[i], b[i]
-        if type(x) ~= type(y) then return false end
-        if type(x) == "table" and not (x.size == y.size and x.name == y.name and x.icon == y.icon
-            and SameMap(x.links, y.links) and SameMap(x.counts, y.counts)) then return false end
-    end
-    return true
+local function Same(x, y)
+    if type(x) ~= type(y) then return false end
+    if type(x) ~= "table" then return x == y end
+    return x.size == y.size and x.name == y.name and x.icon == y.icon
+        and SameMap(x.items, y.items) and SameMap(x.counts, y.counts)
 end
 
-local PatchIndex  -- below, with the tooltip index
+local Patch  -- below, with the tooltip index
 
 -------------------------------------------------------------------------------
---  snapshots
+--  snapshots: only the containers that changed get read again
 -------------------------------------------------------------------------------
 local BAGS = { 0, 1, 2, 3, 4, 5 }
 local CHAR_BANK, WARBAND_BANK = {}, {}
@@ -238,38 +196,51 @@ for i = 1, 5 do
     local id = Enum.BagIndex["AccountBankTab_" .. i]
     if id then WARBAND_BANK[#WARBAND_BANK + 1] = id end
 end
-local BANK_BAG = {}
-for _, id in ipairs(CHAR_BANK) do BANK_BAG[id] = "bank" end
-for _, id in ipairs(WARBAND_BANK) do BANK_BAG[id] = "warband" end
+-- bag id -> its spot in the saved list
+local BAG_POS, CHAR_POS, WARBAND_POS = {}, {}, {}
+for i, id in ipairs(BAGS) do BAG_POS[id] = i end
+for i, id in ipairs(CHAR_BANK) do CHAR_POS[id] = i end
+for i, id in ipairs(WARBAND_BANK) do WARBAND_POS[id] = i end
+
+local dirty = {}  -- bag ids to read on the next save
+
+local function MarkAll(ids) for _, id in ipairs(ids) do dirty[id] = true end end
+
+-- read the dirty ones of ids into list; true if anything changed
+local function SaveList(list, ids, pos, field, owner, meta)
+    local changed = false
+    for _, id in ipairs(ids) do
+        if dirty[id] then
+            dirty[id] = nil
+            local i = pos[id]
+            local new = ReadContainer(id)
+            if new and meta then
+                local m = meta[i]
+                new.name, new.icon = m and m.name, m and m.icon
+            end
+            -- bag slots can be empty (false); unbought bank tabs just stay unsaved
+            if not new and not meta then new = false end
+            if new ~= nil and not Same(list[i], new) then
+                Patch(list[i], new, field, owner)
+                list[i] = new
+                changed = true
+            end
+        end
+    end
+    return changed
+end
 
 local function SaveBags()
     local c = MyEntry()
     if not c then return end
-    local bags = {}
-    for _, bag in ipairs(BAGS) do bags[#bags + 1] = ReadContainer(bag) or false end
     c.bagsTime = time()
+    if type(c.bags) ~= "table" then c.bags = {} end
     -- most bag updates move nothing we keep (cooldowns, locks): no change then
-    if SameList(c.bags, bags) then return end
-    PatchIndex(c.bags, bags, "bags", OwnKey())
-    c.bags = bags
-    Changed("bags")
+    if SaveList(c.bags, BAGS, BAG_POS, "bags", OwnKey()) then Changed("bags", true) end
 end
 
--- bank tabs with names and icons, nil if nothing's readable yet
-local function ReadTabs(bagIDs, bankType)
-    local meta = C_Bank and C_Bank.FetchPurchasedBankTabData and C_Bank.FetchPurchasedBankTabData(bankType)
-    local tabs, any = {}, false
-    for i, bagID in ipairs(bagIDs) do
-        local t = ReadContainer(bagID)
-        if t then
-            any = true
-            local m = meta and meta[i]
-            t.name = m and m.name
-            t.icon = m and m.icon
-            tabs[#tabs + 1] = t
-        end
-    end
-    return any and tabs or nil
+local function Meta(bankType)
+    return C_Bank and C_Bank.FetchPurchasedBankTabData and C_Bank.FetchPurchasedBankTabData(bankType)
 end
 
 local atBank, atCharBank = false, false
@@ -278,29 +249,20 @@ local function SaveBanks()
     if not atBank then return end
     local changed = false
     if atCharBank then
-        local tabs = ReadTabs(CHAR_BANK, Enum.BankType.Character)
-        local c = tabs and MyEntry()
+        local c = MyEntry()
         if c then
             c.bankTime = time()
-            if not SameList(c.bank, tabs) then
-                PatchIndex(c.bank, tabs, "bank", OwnKey())
-                c.bank, changed = tabs, true
-            end
+            if type(c.bank) ~= "table" then c.bank = {} end
+            changed = SaveList(c.bank, CHAR_BANK, CHAR_POS, "bank", OwnKey(), Meta(Enum.BankType.Character) or {})
         end
     end
     local locked = C_Bank and C_Bank.FetchBankLockedReason and C_Bank.FetchBankLockedReason(Enum.BankType.Account)
     if locked == nil then
-        local tabs = ReadTabs(WARBAND_BANK, Enum.BankType.Account)
-        if tabs then
-            local w = Offline.Store().warband
-            w.time = time()
-            if not SameList(w.tabs, tabs) then
-                PatchIndex(w.tabs, tabs)
-                w.tabs, changed = tabs, true
-            end
-        end
+        local w = Offline.Store().warband
+        w.time = time()
+        if SaveList(w.tabs, WARBAND_BANK, WARBAND_POS, nil, nil, Meta(Enum.BankType.Account) or {}) then changed = true end
     end
-    if changed then Changed("bank") end
+    if changed then Changed("bank", true) end
 end
 
 -- a burst of updates only saves once
@@ -324,13 +286,22 @@ end
 local PIT = Enum.PlayerInteractionType
 local ev = CreateFrame("Frame")
 ev:SetScript("OnEvent", function(_, event, arg)
-    if event == "BAG_UPDATE_DELAYED" then
-        Queue(true, atBank)
-    elseif event == "BAG_UPDATE" then
-        if atBank and BANK_BAG[arg] then Queue(false, true) end
+    if event == "BAG_UPDATE" then
+        if BAG_POS[arg] then
+            dirty[arg] = true
+        elseif atBank and (CHAR_POS[arg] or WARBAND_POS[arg]) then
+            dirty[arg] = true
+            Queue(false, true)
+        end
+    elseif event == "BAG_UPDATE_DELAYED" then
+        Queue(true, false)
+    elseif event == "BAG_CONTAINER_UPDATE" then
+        MarkAll(BAGS)
+        Queue(true, false)
     elseif event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" then
         if arg == PIT.Banker or arg == PIT.AccountBanker then
             atBank, atCharBank = true, arg == PIT.Banker
+            MarkAll(CHAR_BANK); MarkAll(WARBAND_BANK)
             Queue(false, true)
         end
     elseif event == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" then
@@ -338,79 +309,79 @@ ev:SetScript("OnEvent", function(_, event, arg)
             Flush()  -- save before the contents go unreadable
             atBank, atCharBank = false, false
         end
-    elseif event == "PLAYERBANKSLOTS_CHANGED" or event == "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED"
-        or event == "BANK_TABS_CHANGED" then
-        if atBank then Queue(false, true) end
+    elseif atBank then
+        -- tab bought or edited, or a slot event without a bag id
+        if event == "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED" and WARBAND_POS[arg] then
+            dirty[arg] = true
+        elseif event == "PLAYERBANKSLOTS_CHANGED" then
+            MarkAll(CHAR_BANK)
+        else
+            MarkAll(CHAR_BANK); MarkAll(WARBAND_BANK)
+        end
+        Queue(false, true)
     end
 end)
-local EVENTS = { "BAG_UPDATE_DELAYED", "BAG_UPDATE", "PLAYER_INTERACTION_MANAGER_FRAME_SHOW",
-    "PLAYER_INTERACTION_MANAGER_FRAME_HIDE", "PLAYERBANKSLOTS_CHANGED",
-    "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", "BANK_TABS_CHANGED" }
--- syndicator updates refresh the viewer while we're using its data
-local synHooked = false
-local function HookSyndicator()
-    if synHooked or not SynAPI() then return end
-    local reg = _G.Syndicator.CallbackRegistry
-    if not (reg and reg.RegisterCallback) then return end
-    synHooked = true
-    local function OnSyn() if Offline.UsingSyndicator() then Changed("syndicator") end end
-    for _, e in ipairs({ "BagCacheUpdate", "WarbandBankCacheUpdate", "CurrencyCacheUpdate", "CharacterDeleted", "Ready" }) do
-        reg:RegisterCallback(e, OnSyn, Offline)
-    end
-end
+local EVENTS = { "BAG_UPDATE_DELAYED", "BAG_UPDATE", "BAG_CONTAINER_UPDATE",
+    "PLAYER_INTERACTION_MANAGER_FRAME_SHOW", "PLAYER_INTERACTION_MANAGER_FRAME_HIDE",
+    "PLAYERBANKSLOTS_CHANGED", "PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", "BANK_TABS_CHANGED" }
 
 local listening = false
+local IndexSoon  -- below
 function Offline.Sync()
-    if Offline.UsingSyndicator() then HookSyndicator() end
-    rev = rev + 1  -- the source might've changed
     local on = Active()
     if on == listening then return end
     listening = on
     for _, e in ipairs(EVENTS) do
         if on then pcall(ev.RegisterEvent, ev, e) else ev:UnregisterEvent(e) end
     end
-    if on then Queue(true, false) end
-    if Offline.SyncTooltip then Offline.SyncTooltip() end
-    if Offline.SyncButton then Offline.SyncButton() end
+    if on then
+        MarkAll(BAGS)
+        Queue(true, false)
+    end
+end
+
+-- the bags module reset: every saved inventory goes
+function Offline.Wipe()
+    _G.EllesmereUIBagsInventoryDB = nil
+    index = nil
+    Changed("forget")
+    -- this character saves again right away
+    MarkAll(BAGS)
+    if listening then Queue(true, false) end
+end
+
+-- an options toggle: key is bagOfflineBank or bagTooltipCounts
+function Offline.Set(key, on)
+    if not _G.EllesmereUIDB then return end
+    _G.EllesmereUIDB[key] = on and true or nil
+    Offline.Sync()
+    Offline.SyncTooltip()
+    Offline.SyncButton()
 end
 
 -------------------------------------------------------------------------------
 --  tooltip item counts
 -------------------------------------------------------------------------------
--- item id from a link (pet cages count as the cage item)
-local function LinkID(link)
-    local kind, id = link:match("|H(%a+):(%d+)")
-    if kind == "battlepet" then return 82800 end
-    return tonumber(id)
-end
-Offline.LinkID = LinkID
-
-local index, indexRev  -- itemID -> { [key] = { bags, bank } }, warband[itemID]
-
--- sign -1 takes a list back out (rows that hit zero go away)
-local function AddContainers(list, into, field, owner, sign)
-    if type(list) ~= "table" then return end
-    sign = sign or 1
-    for _, t in ipairs(list) do
-        if type(t) == "table" and type(t.links) == "table" then
-            for slot, link in pairs(t.links) do
-                local id = LinkID(link)
-                if id then
-                    local n = ((t.counts and t.counts[slot]) or 1) * sign
-                    local row = into[id]
-                    if not row then row = {}; into[id] = row end
-                    if owner then
-                        local e = row[owner]
-                        if not e then e = { bags = 0, bank = 0 }; row[owner] = e end
-                        e[field] = e[field] + n
-                        if e.bags + e.bank <= 0 then row[owner] = nil end
-                    else
-                        row.n = (row.n or 0) + n
-                        if row.n <= 0 then row.n = nil end
-                    end
-                    if next(row) == nil then into[id] = nil end
-                end
+-- index: chars[itemID][key] = { bags, bank }, warband[itemID].n
+-- sign -1 takes a container back out (rows that hit zero go away)
+local function AddContainer(t, into, field, owner, sign)
+    if type(t) ~= "table" or type(t.items) ~= "table" then return end
+    for slot, s in pairs(t.items) do
+        local id = ItemID(s)
+        if id then
+            local n = ((t.counts and t.counts[slot]) or 1) * sign
+            local row = into[id]
+            if not row then row = {}; into[id] = row end
+            if owner then
+                local e = row[owner]
+                if not e then e = { bags = 0, bank = 0 }; row[owner] = e end
+                e[field] = e[field] + n
+                if e.bags + e.bank <= 0 then row[owner] = nil end
+            else
+                row.n = (row.n or 0) + n
+                if row.n <= 0 then row.n = nil end
             end
+            if next(row) == nil then into[id] = nil end
         end
     end
 end
@@ -421,30 +392,59 @@ local function Index()
     local db = Offline.Store()
     for key, c in pairs(db.chars) do
         if type(c) == "table" then
-            AddContainers(c.bags, chars, "bags", key)
-            AddContainers(c.bank, chars, "bank", key)
+            for _, t in ipairs(type(c.bags) == "table" and c.bags or _emptyP) do AddContainer(t, chars, "bags", key, 1) end
+            for _, t in ipairs(type(c.bank) == "table" and c.bank or _emptyP) do AddContainer(t, chars, "bank", key, 1) end
         end
     end
-    AddContainers(db.warband.tabs, war)
+    for _, t in ipairs(db.warband.tabs) do AddContainer(t, war, nil, nil, 1) end
     index, indexRev = { chars = chars, warband = war }, rev
     return index
 end
 
--- one list swapped for another: fix the index up in place instead of a full
--- rebuild on the next hover. no owner = the warband bank. runs before the
--- write's Changed, so it marks the index as current for the next rev.
-PatchIndex = function(old, new, field, owner)
-    -- rev + 1: an earlier patch in the same write (the bank, then the warband)
-    if not (index and (indexRev == rev or indexRev == rev + 1)) then return end
+-- one container swapped for another: fix the index up in place instead of a
+-- full rebuild on the next hover (Changed keeps it current). no owner = warband
+Patch = function(old, new, field, owner)
+    if not (index and indexRev == rev) then return end
     local into = owner and index.chars or index.warband
-    AddContainers(old, into, field, owner, -1)
-    AddContainers(new, into, field, owner)
-    indexRev = rev + 1
+    AddContainer(old, into, field, owner, -1)
+    AddContainer(new, into, field, owner, 1)
+end
+
+-- built a moment after login, not inside the first hover
+IndexSoon = function()
+    C_Timer.After(3, function() if listening and Offline.CountsEnabled() then Index() end end)
 end
 
 local function ClassHex(class)
     local c = class and C_ClassColor and C_ClassColor.GetClassColor(class)
     return c and c:GenerateHexColorMarkup() or "|cffffffff"
+end
+
+-- finished lines per item id, until the next write
+local lineCache, lineRev = {}, -1
+local function BuildLines(id)
+    local idx = Index()
+    local row, war = idx.chars[id], idx.warband[id]
+    if not row and not (war and war.n) then return false end
+    local db, lines, total = Offline.Store(), {}, 0
+    for key, e in pairs(row or _emptyP) do
+        local c = db.chars[key]
+        local n = e.bags + e.bank
+        if c and n > 0 then
+            local parts = {}
+            if e.bags > 0 then parts[#parts + 1] = EllesmereUI.L("Bags") .. " " .. e.bags end
+            if e.bank > 0 then parts[#parts + 1] = EllesmereUI.L("Bank") .. " " .. e.bank end
+            lines[#lines + 1] = { ClassHex(c.class) .. (c.name or "?") .. "|r", table.concat(parts, "  "), 1, 1, 1, n = n }
+            total = total + n
+        end
+    end
+    table.sort(lines, function(a, b) return a.n > b.n end)
+    if war and war.n then
+        total = total + war.n
+        lines[#lines + 1] = { EllesmereUI.L("Warband Bank"), war.n, 0.4, 0.78, 1 }
+    end
+    if #lines > 1 then lines[#lines + 1] = { EllesmereUI.L("Total"), total, 1, 0.82, 0, total = true } end
+    return lines
 end
 
 local function OnItemTooltip(tooltip, data)
@@ -453,40 +453,26 @@ local function OnItemTooltip(tooltip, data)
     if tooltip:IsForbidden() then return end
     local id = data and data.id
     if type(id) ~= "number" or (issecretvalue and issecretvalue(id)) then return end
-    local idx = Index()
-    local row, war = idx.chars[id], idx.warband[id]
-    if not row and not (war and war.n) then return end
-
-    local db, lines, total = Offline.Store(), {}, 0
-    for key, e in pairs(row or {}) do
-        local c = db.chars[key]
-        if c and (e.bags + e.bank) > 0 then
-            lines[#lines + 1] = { c, e }
-            total = total + e.bags + e.bank
-        end
-    end
-    table.sort(lines, function(a, b) return (a[2].bags + a[2].bank) > (b[2].bags + b[2].bank) end)
+    if lineRev ~= rev then wipe(lineCache); lineRev = rev end
+    local lines = lineCache[id]
+    if lines == nil then lines = BuildLines(id); lineCache[id] = lines end
+    if not lines then return end
     tooltip:AddLine(" ")
     for _, l in ipairs(lines) do
-        local c, e = l[1], l[2]
-        local parts = {}
-        if e.bags > 0 then parts[#parts + 1] = EllesmereUI.L("Bags") .. " " .. e.bags end
-        if e.bank > 0 then parts[#parts + 1] = EllesmereUI.L("Bank") .. " " .. e.bank end
-        tooltip:AddDoubleLine(ClassHex(c.class) .. (c.name or "?") .. "|r", table.concat(parts, "  "), 1, 1, 1, 0.8, 0.8, 0.8)
-    end
-    if war and war.n then
-        total = total + war.n
-        tooltip:AddDoubleLine(EllesmereUI.L("Warband Bank"), war.n, 0.4, 0.78, 1, 0.8, 0.8, 0.8)
-    end
-    if #lines + (war and 1 or 0) > 1 then
-        tooltip:AddDoubleLine(EllesmereUI.L("Total"), total, 1, 0.82, 0, 1, 1, 1)
+        if l.total then
+            tooltip:AddDoubleLine(l[1], l[2], l[3], l[4], l[5], 1, 1, 1)
+        else
+            tooltip:AddDoubleLine(l[1], l[2], l[3], l[4], l[5], 0.8, 0.8, 0.8)
+        end
     end
 end
 
 -- the post call can't be unhooked, so it just bails while off
 local hooked = false
 function Offline.SyncTooltip()
-    if hooked or not (listening and Offline.CountsEnabled()) then return end
+    if not (listening and Offline.CountsEnabled()) then return end
+    IndexSoon()
+    if hooked then return end
     if not (TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall) then return end
     hooked = true
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnItemTooltip)
@@ -501,4 +487,5 @@ boot:SetScript("OnEvent", function(self)
     self:UnregisterEvent("PLAYER_LOGIN")
     Offline.Store()
     Offline.Sync()
+    Offline.SyncTooltip()
 end)

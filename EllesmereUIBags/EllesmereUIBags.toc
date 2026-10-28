@@ -6,7 +6,6 @@
 ## Author: Ellesmere
 ## Version: 9.7
 ## Dependencies: EllesmereUI
-## OptionalDeps: Syndicator
 ## SavedVariables: EllesmereUIBagsDB, EllesmereUIBagsInventoryDB
 ## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga
 

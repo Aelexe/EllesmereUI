@@ -2784,11 +2784,13 @@ end
 -------------------------------------------------------------------------------
 local _drag  -- { btn, scope, id, startY, live } while a drag is going
 
--- a row's block id + category indices in this scope ("top" or "group:<name>"), nil if it's not in it
-local function DragBlock(btn, scope)
-    local sel = btn._catSel
+-- a row's selection, nil for the buy rows
+local function RowSel(btn) return not btn._isPurchaseTab and btn._catSel or nil end
+
+-- a selection's block id + category indices in this scope ("top" or "group:<name>"), nil if it's not in it
+local function DragBlock(sel, scope)
     local CM = _G.EUI_CategoryManager
-    if not (sel and CM) or btn._isPurchaseTab then return nil end
+    if not (sel and CM) then return nil end
     local cats = CM:GetCategories()
     local group, i = sel.group, nil
     if not group then
@@ -2859,12 +2861,12 @@ local function DragTarget()
         if b:IsShown() and b:IsMouseOver() then over = b; break end
     end
     if not over then return nil end
-    local id, block = DragBlock(over, _drag.scope)
+    local id, block = DragBlock(RowSel(over), _drag.scope)
     if not id or id == _drag.id then return nil end
     -- all of the block's rows (a group's header, members, details)
     local top, bottom
     for _, b in pairs(_sidebarBtns) do
-        if b:IsShown() and DragBlock(b, _drag.scope) == id then
+        if b:IsShown() and DragBlock(RowSel(b), _drag.scope) == id then
             if not top or b:GetTop() > top:GetTop() then top = b end
             if not bottom or b:GetBottom() < bottom:GetBottom() then bottom = b end
         end
@@ -2886,7 +2888,8 @@ local function FinishDrag(apply)
     if not target then return end
     local CM = _G.EUI_CategoryManager
     local cats = CM:GetCategories()
-    local _, block = DragBlock(d.btn, d.scope)
+    -- from the row's selection at press time: a refresh mid-drag can hand the pooled row to another category
+    local _, block = DragBlock(d.sel, d.scope)
     if not block then return end
     local insertAt = d.after and (math.max(unpack(target)) + 1) or math.min(unpack(target))
     table.sort(block)
@@ -2953,7 +2956,8 @@ local function BeginDrag(btn)
     local scope = DragScope(btn)
     if not scope then return end
     local _, y = GetCursorPosition()
-    _drag = { btn = btn, scope = scope, id = DragBlock(btn, scope), startY = y }
+    local sel = RowSel(btn)
+    _drag = { btn = btn, sel = sel, scope = scope, id = DragBlock(sel, scope), startY = y }
     dragFrame:Show()
 end
 -- closing the bank mid-drag hides the rows, so the drop just goes nowhere
@@ -3221,6 +3225,15 @@ function BuildBankSidebar()
     -- would have nothing left to click.
     local showTabs = not (BP().bankHideTabsInSidebar and BP().bankCategorySidebar and _catIndex)
 
+    -- offline bank on: tabs nest under their all entry, a divider splits the
+    -- bank and warbank views and the buy entries go last (an alt's bank draws
+    -- the same way). off: the usual layout
+    local nested = ns.Offline and ns.Offline.Enabled()
+    for _, k in ipairs(nested and { "_bankTabDivider", "_warbandDivider", "_warbandTabDivider" }
+        or { "_warbandViewDivider", "_buyDivider" }) do
+        if sidebarChild[k] then sidebarChild[k]:Hide() end
+    end
+
     -- tabs nested under their all entry
     local function NestTabs(warband)
         if not showTabs then return end
@@ -3233,30 +3246,50 @@ function BuildBankSidebar()
     end
 
     local defaultOneBag = BankDefaultsToOne()
-    if not _warbandOnly then
-        local function All()
-            RenderSidebarEntry(0, EllesmereUI.L("All Bank Tabs"), 413587, charUsed, selView == 0)
-            NestTabs(false)
-        end
-        local function One() RenderSidebarEntry(-1, EllesmereUI.L("OneBank"), 1542860, charUsed, selView == -1) end
-        if defaultOneBag then One(); All() else All(); One() end
-    end
-
-    -- Warband "All" and "One" entries
     local hasWarband = false
     for _, tab in ipairs(_allTabs) do
         if tab.isWarband then hasWarband = true; break end
     end
-    if sidebarChild._warbandViewDivider then sidebarChild._warbandViewDivider:Hide() end
-    if hasWarband then
-        -- keeps the bank and warbank views apart
-        if not _warbandOnly then ShowDivider("_warbandViewDivider") end
-        local function All()
-            RenderSidebarEntry(-2, EllesmereUI.L("All Warbank Tabs"), 1542854, warbUsed, selView == -2)
-            NestTabs(true)
+    if nested then
+        if not _warbandOnly then
+            local function All()
+                RenderSidebarEntry(0, EllesmereUI.L("All Bank Tabs"), 413587, charUsed, selView == 0)
+                NestTabs(false)
+            end
+            local function One() RenderSidebarEntry(-1, EllesmereUI.L("OneBank"), 1542860, charUsed, selView == -1) end
+            if defaultOneBag then One(); All() else All(); One() end
         end
-        local function One() RenderSidebarEntry(-3, EllesmereUI.L("OneWarbank"), 1542854, warbUsed, selView == -3) end
-        if defaultOneBag then One(); All() else All(); One() end
+        if hasWarband then
+            -- keeps the bank and warbank views apart
+            if not _warbandOnly then ShowDivider("_warbandViewDivider") end
+            local function All()
+                RenderSidebarEntry(-2, EllesmereUI.L("All Warbank Tabs"), 1542854, warbUsed, selView == -2)
+                NestTabs(true)
+            end
+            local function One() RenderSidebarEntry(-3, EllesmereUI.L("OneWarbank"), 1542854, warbUsed, selView == -3) end
+            if defaultOneBag then One(); All() else All(); One() end
+        end
+    else
+        if not _warbandOnly then
+            if defaultOneBag then
+                RenderSidebarEntry(-1, EllesmereUI.L("OneBank"), 1542860, charUsed, selView == -1)
+                RenderSidebarEntry(0, EllesmereUI.L("All Bank Tabs"), 413587, charUsed, selView == 0)
+            else
+                RenderSidebarEntry(0, EllesmereUI.L("All Bank Tabs"), 413587, charUsed, selView == 0)
+                RenderSidebarEntry(-1, EllesmereUI.L("OneBank"), 1542860, charUsed, selView == -1)
+            end
+        end
+
+        -- Warband "All" and "One" entries
+        if hasWarband then
+            if defaultOneBag then
+                RenderSidebarEntry(-3, EllesmereUI.L("OneWarbank"), 1542854, warbUsed, selView == -3)
+                RenderSidebarEntry(-2, EllesmereUI.L("All Warbank Tabs"), 1542854, warbUsed, selView == -2)
+            else
+                RenderSidebarEntry(-2, EllesmereUI.L("All Warbank Tabs"), 1542854, warbUsed, selView == -2)
+                RenderSidebarEntry(-3, EllesmereUI.L("OneWarbank"), 1542854, warbUsed, selView == -3)
+            end
+        end
     end
 
     -- Category entries, mirroring the bags sidebar: group header, then its
@@ -3342,20 +3375,63 @@ function BuildBankSidebar()
         sidebarChild._catDivider:Hide()
     end
 
-    -- buy entries go at the bottom
-    local canBuyChar = not _warbandOnly and C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
-        and C_Bank.CanPurchaseBankTab(Enum.BankType.Character)
-        and not C_Bank.HasMaxBankTabs(Enum.BankType.Character)
-    local canBuyWarband = C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
-        and C_Bank.CanPurchaseBankTab(Enum.BankType.Account)
-        and not C_Bank.HasMaxBankTabs(Enum.BankType.Account)
-    if canBuyChar or canBuyWarband then
-        ShowDivider("_buyDivider")
-    elseif sidebarChild._buyDivider then
-        sidebarChild._buyDivider:Hide()
+    if nested then
+        -- buy entries go at the bottom
+        local canBuyChar = not _warbandOnly and C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
+            and C_Bank.CanPurchaseBankTab(Enum.BankType.Character)
+            and not C_Bank.HasMaxBankTabs(Enum.BankType.Character)
+        local canBuyWarband = C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
+            and C_Bank.CanPurchaseBankTab(Enum.BankType.Account)
+            and not C_Bank.HasMaxBankTabs(Enum.BankType.Account)
+        if canBuyChar or canBuyWarband then ShowDivider("_buyDivider") end
+        if canBuyChar then RenderPurchaseEntry(Enum.BankType.Character, "Buy Bank Tab") end
+        if canBuyWarband then RenderPurchaseEntry(Enum.BankType.Account, "Buy Warbank Tab") end
+    else
+        if not _warbandOnly and showTabs then
+            ShowDivider("_bankTabDivider")
+
+            -- Character bank tabs
+            for ti, tab in ipairs(_allTabs) do
+                if not tab.isWarband then
+                    RenderSidebarEntry(ti, tab.name, tab.icon or 133652, tab._usedSlots, selView == ti)
+                end
+            end
+        else
+            if sidebarChild._bankTabDivider then sidebarChild._bankTabDivider:Hide() end
+        end
+
+        -- Purchase character bank tab, outside the tab list: hiding the tabs must not
+        -- remove the only way to buy one. Matches the warband entry below.
+        if not _warbandOnly and C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
+            and C_Bank.CanPurchaseBankTab(Enum.BankType.Character)
+            and not C_Bank.HasMaxBankTabs(Enum.BankType.Character) then
+            if not showTabs then ShowDivider("_bankTabDivider") end
+            RenderPurchaseEntry(Enum.BankType.Character, "Buy Bank Tab")
+        end
+
+        -- Warband individual tabs
+        if hasWarband and showTabs then
+            ShowDivider("_warbandDivider")
+
+            for ti, tab in ipairs(_allTabs) do
+                if tab.isWarband then
+                    RenderSidebarEntry(ti, tab.name, tab.icon or 1542854, tab._usedSlots, selView == ti)
+                end
+            end
+        else
+            if sidebarChild._warbandDivider then sidebarChild._warbandDivider:Hide() end
+            if sidebarChild._warbandTabDivider then sidebarChild._warbandTabDivider:Hide() end
+        end
+        -- Purchase warband bank tab
+        if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
+            and C_Bank.CanPurchaseBankTab(Enum.BankType.Account)
+            and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
+            if not hasWarband then
+                ShowDivider("_warbandDivider")
+            end
+            RenderPurchaseEntry(Enum.BankType.Account, "Buy Warbank Tab")
+        end
     end
-    if canBuyChar then RenderPurchaseEntry(Enum.BankType.Character, "Buy Bank Tab") end
-    if canBuyWarband then RenderPurchaseEntry(Enum.BankType.Account, "Buy Warbank Tab") end
 
     -- Set scroll child height so scrolling works when content overflows
     sidebarChild:SetHeight(math.abs(y) + 4)

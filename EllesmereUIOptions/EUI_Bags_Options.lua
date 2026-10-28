@@ -159,48 +159,19 @@ initFrame:SetScript("OnEvent", function(self)
                     EllesmereUI.BlankRowCfg()
                 ); y = y - h
 
-                -- offline bank (not on wow forever)
+                -- offline bank (not on wow forever). account-wide, like the data it saves
                 local Offline = BagsNS and BagsNS.Offline
                 if Offline then
                     _, h = W:SectionHeader(parent, "OFFLINE BANK", y); y = y - h
                     _, h = W:DualRow(parent, y,
                         { type="toggle", text="Offline Bank",
-                          tooltip="Saves each character's bags and bank, and the warband bank, when you see them. Use the person button by the bags or bank title to see another character's bags or bank, and Bank in the bags sidebar for their bank or the warband bank, from anywhere.",
-                          getValue=function() return db.profile.bagOfflineBank == true end,
-                          setValue=function(v)
-                              db.profile.bagOfflineBank = v and true or false
-                              Offline.Sync()
-                              Offline.SyncButton()
-                              EllesmereUI:RefreshPage()
-                          end },
+                          tooltip="Saves each character's bags and bank, and the warband bank, when you see them. Use the person button by the bags or bank title to see another character's bags or bank, and Bank in the bags sidebar for their bank or the warband bank, from anywhere. Applies to all characters.",
+                          getValue=function() return Offline.Enabled() end,
+                          setValue=function(v) Offline.Set("bagOfflineBank", v) end },
                         { type="toggle", text="Tooltip Item Counts",
-                          tooltip="Item tooltips list how many of that item each of your characters has in their bags and bank, plus the warband bank.",
-                          disabled = function() return Offline.UsingSyndicator() end,
-                          disabledTooltip = "Syndicator adds its own item counts to tooltips while its data is in use.",
-                          getValue=function() return db.profile.bagTooltipCounts == true end,
-                          setValue=function(v)
-                              db.profile.bagTooltipCounts = v and true or false
-                              Offline.Sync()
-                              Offline.SyncTooltip()
-                          end }
-                    ); y = y - h
-                    _, h = W:DualRow(parent, y,
-                        { type="toggle", text="Use Syndicator Data",
-                          tooltip="Bank in the bags sidebar shows the characters and banks Syndicator has saved, including characters it saw before EllesmereUI was installed. Syndicator's own tooltip counts are used while this is on.",
-                          disabled = function() return not Offline.SyndicatorLoaded() or db.profile.bagOfflineBank ~= true end,
-                          disabledTooltip = function()
-                              if not Offline.SyndicatorLoaded() then return "Syndicator isn't installed or enabled." end
-                              return "Turn on Offline Bank first."
-                          end,
-                          getValue=function() return db.profile.bagSyndicator == true end,
-                          setValue=function(v)
-                              db.profile.bagSyndicator = v and true or false
-                              Offline.Sync()
-                              Offline.SyncTooltip()
-                              Offline.SyncButton()
-                              EllesmereUI:RefreshPage()
-                          end },
-                        EllesmereUI.BlankRowCfg()
+                          tooltip="Item tooltips list how many of that item each of your characters has in their bags and bank, plus the warband bank. Applies to all characters.",
+                          getValue=function() return Offline.CountsEnabled() end,
+                          setValue=function(v) Offline.Set("bagTooltipCounts", v) end }
                     ); y = y - h
                 end
 
@@ -1173,6 +1144,16 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.dataBarsGold = nil
                 EllesmereUIDB.warbandGold = nil
                 EllesmereUIDB.bagCurrencyByChar = nil
+                -- offline bank: its switches and every saved inventory
+                EllesmereUIDB.bagOfflineBank = nil
+                EllesmereUIDB.bagTooltipCounts = nil
+            end
+            local bagsNS = EllesmereUI._ModuleNS and EllesmereUI._ModuleNS["EllesmereUIBags"]
+            local Offline = bagsNS and bagsNS.Offline
+            if Offline then
+                Offline.Wipe()
+                Offline.Sync()
+                Offline.SyncButton()
             end
             EllesmereUI:InvalidatePageCache()
         end,

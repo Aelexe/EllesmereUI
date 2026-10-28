@@ -8,12 +8,13 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --    * bank window: same button and "Name's Bank". an alt's bank shows over
 --      the live one, with their tabs over the live sidebar.
 --
---  each view is a see-through panel over the window's items, which just fade
---  out underneath (alpha only, the secure buttons never move). the bags call
---  ns.OfflinePanel after every refresh, the bank hooks RefreshBank. our item
---  buttons are display only and never touch a real slot, so it's all safe in
---  combat. hover for tooltips, shift-click links, ctrl-click previews, and the
---  window's search filters it too.
+--  each view is a panel over the window's item area. the bags lay out no live
+--  items under it, the bank's just fade out (alpha only, the secure buttons
+--  never move). the bags call ns.OfflinePanel after every refresh, the bank
+--  hooks RefreshBank, and a paint only happens when something it shows moved.
+--  our item buttons are display only and never touch a real slot, so it's all
+--  safe in combat. hover for tooltips, shift-click links, ctrl-click previews,
+--  and the window's search filters it too.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
 local ns = select(2, ...)
@@ -89,17 +90,16 @@ end
 -- the alt whose bags are showing (nil if it's this character)
 function ns.OfflineAlt() return AltKey(bagsView) end
 
--- the window's search, lower-cased ("" when empty)
-local function Query(v)
-    local box = v.win and v.win._searchBox
-    return box and (box:GetText() or ""):lower() or ""
+-- the search the game has applied (both windows share it), lower-cased
+local function Query()
+    return (EUI_Bags._appliedSearch or ""):lower()
 end
 
 local Paint, PaintSide, SyncBank  -- forward
 
 local function Repaint(v)
     if v.scroll then v.scroll:SetVerticalScroll(0) end
-    Paint(v)
+    Paint(v, true)
 end
 
 -- rebuild the window around a new pick
@@ -208,8 +208,12 @@ local function SyncTitle(v, title, count)
     count:SetPoint("LEFT", title, "RIGHT", 8, 0)
 end
 
+local Place  -- below
 -- closing a window goes back to this character
-EUI_Bags:HookScript("OnHide", function() bagsView.key = nil end)
+EUI_Bags:HookScript("OnHide", function()
+    bagsView.key = nil
+    if bagsView.mode then Place(bagsView, nil) end
+end)
 
 -------------------------------------------------------------------------------
 --  the panel: a bar (bank/warband, saved time, gold) over a scrolling grid
@@ -318,20 +322,16 @@ local function Build(v)
     v.empty:SetTextColor(0.6, 0.6, 0.6)
 
     panel:SetScript("OnHide", function() GameTooltip:Hide() end)
-    -- the window's search filters this view too
-    if win._searchBox then
-        win._searchBox:HookScript("OnTextChanged", function() if panel:IsShown() then Repaint(v) end end)
-    end
 end
 
 -------------------------------------------------------------------------------
 --  item buttons (display only)
 -------------------------------------------------------------------------------
 local function SlotOnEnter(self)
-    if not self.link then return end
+    if not self.str then return end
     ns.SetInsetBorderColor(self, 1, 1, 1, 1)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetHyperlink(self.link)
+    GameTooltip:SetHyperlink(self.str)
     GameTooltip:Show()
 end
 local function SlotOnLeave(self)
@@ -339,7 +339,11 @@ local function SlotOnLeave(self)
     GameTooltip:Hide()
 end
 local function SlotOnClick(self)
-    if self.link then HandleModifiedItemClick(self.link) end
+    local s = self.str
+    if not s then return end
+    -- items saved as strings get their full link back from the item cache
+    local link = s:find("|H", 1, true) and s or select(2, GetItemInfo(s))
+    if link then HandleModifiedItemClick(link) end
 end
 
 local function Slot(v, i)
@@ -408,56 +412,82 @@ end
 
 local waiting = false  -- item data asked for; one repaint when it lands
 
+-- name, quality, icon for a saved string (pets and keystones are full links)
+local function Info(s, id)
+    local name, _, q, _, _, _, _, _, _, icon
+    if s:sub(1, 5) == "item:" then
+        name, _, q, _, _, _, _, _, _, icon = GetItemInfo(s)
+    else
+        name = s:match("%[(.-)%]")
+        _, _, q, _, _, _, _, _, _, icon = GetItemInfo(id)
+        local species, _, breed = s:match("|Hbattlepet:(%d+):(%d+):(%d+)")
+        if species and C_PetJournal then
+            local _, petIcon = C_PetJournal.GetPetInfoBySpeciesID(tonumber(species))
+            icon, q = petIcon or icon, tonumber(breed) or q
+        end
+    end
+    return name, q, icon
+end
+
 -- every saved item as a display entry with its bags category; one pass per
--- list, store rev and frame, so the sidebar counts and the paint share it
+-- list, store rev and frame, so the sidebar counts and the paint share it.
+-- bags: it's a bags list, so the 6th container is the reagent bag
 local pass = {}
-local function Classified(list)
+local function Classified(list, bags)
     local now = GetTime()
     if pass.list == list and pass.rev == Offline.Rev() and pass.time == now then
+        if pass.waiting then waiting = true end
         return pass.items, pass.used, pass.total
     end
-    local items, used, total = {}, 0, 0
+    local items, used, total, wait = {}, 0, 0, false
     local mgr = _G.EUI_CategoryManager
     local cats = mgr and mgr:GetCategories()
-    -- the catch-all once, not per item; disabled categories land in it
-    local catchAll
-    for i, cat in ipairs(cats or {}) do if cat.isCatchAll then catchAll = i end end
+    -- the catch-all and reagent bag once, not per item; disabled categories land in the catch-all
+    local catchAll, reagent
+    for i, cat in ipairs(cats or {}) do
+        if cat.isCatchAll then catchAll = i end
+        if cat.isReagentBag then reagent = i end
+    end
     local disabled = BP().bagDisabledCategories or _emptyP
-    for _, t in ipairs(type(list) == "table" and list or {}) do
+    for pos, t in ipairs(type(list) == "table" and list or {}) do
         if type(t) == "table" then
             total = total + (t.size or 0)
-            for slot, link in pairs(type(t.links) == "table" and t.links or {}) do
+            local inReagent = bags and pos == 6 and reagent
+            for slot, str in pairs(type(t.items) == "table" and t.items or {}) do
                 used = used + 1
-                local id = Offline.LinkID(link)
-                local _, _, q, _, _, _, _, _, _, icon = GetItemInfo(link)
+                local id = Offline.ItemID(str)
+                local name, q, icon = Info(str, id)
                 if q == nil then
-                    waiting = true
+                    wait = true
                     if id then C_Item.RequestLoadItemDataByID(id) end
                 end
                 local idx = 0
-                if cats then
-                    idx = mgr:ClassifyItem(link, id, nil, nil, q or 1) or catchAll or #cats
-                    local cat = cats[idx]
-                    if catchAll and cat and cat._defaultName and disabled[cat._defaultName] then idx = catchAll end
+                if inReagent then
+                    idx = reagent
+                elseif cats then
+                    idx = mgr:ClassifyItem(str, id, nil, nil, q or 1) or catchAll or #cats
                 end
-                local name = link:match("%[(.-)%]") or ""
-                local _, _, _, _, instIcon, classID = GetItemInfoInstant(link)
+                local cat = cats and cats[idx]
+                if catchAll and cat and cat._defaultName and disabled[cat._defaultName] then idx = catchAll end
+                name = name or ""
+                local _, _, _, _, instIcon, classID = GetItemInfoInstant(id or str)
                 items[#items + 1] = {
-                    link = link, id = id, name = name, lower = name:lower(), q = q or 1,
+                    str = str, id = id, name = name, lower = name:lower(), q = q or 1,
                     icon = icon or instIcon, cat = idx, n = (t.counts and t.counts[slot]) or 1,
                     gear = classID == ITEM_CLASS_WEAPON or classID == ITEM_CLASS_ARMOR,
                 }
             end
         end
     end
-    pass.list, pass.rev, pass.time = list, Offline.Rev(), now
+    if wait then waiting = true end
+    pass.list, pass.rev, pass.time, pass.waiting = list, Offline.Rev(), now, wait
     pass.items, pass.used, pass.total = items, used, total
     return items, used, total
 end
 
 -- the classified items, cut down to the search and the filter's categories
-local function Collect(list, query, filter)
-    local all, used, total = Classified(list)
+local function Collect(list, bags, query, filter)
+    local all, used, total = Classified(list, bags)
     if query == "" and not filter then return all, used, total end
     local items = {}
     for _, it in ipairs(all) do
@@ -472,7 +502,7 @@ end
 function ns.OfflineCounts()
     local c = Offline.Char(bagsView.key)
     local counts, total = {}, 0
-    for _, it in ipairs((Classified(c and c.bags))) do
+    for _, it in ipairs((Classified(c and c.bags, true))) do
         counts[it.cat] = (counts[it.cat] or 0) + 1
         total = total + 1
     end
@@ -508,7 +538,7 @@ local function Group(items)
         table.sort(g.items, function(a, b)
             if a.q ~= b.q then return a.q > b.q end
             if a.name ~= b.name then return a.name < b.name end
-            return a.link < b.link
+            return a.str < b.str
         end)
     end
     return groups
@@ -516,13 +546,13 @@ end
 
 local function PaintSlot(b, it)
     local z = BP().bagItemIconZoom or 0.08
-    b.link = it.link
+    b.str = it.str
     b.icon:SetTexture(it.icon or 134400)
     b.icon:SetTexCoord(z, 1 - z, z, 1 - z)
     EUI.ApplyIconTextFont(b.Count, GetFont(), BP().bagCountFontSize or 11, "bags")
     b.Count:SetText(it.n > 1 and it.n or "")
     b.Level:SetFont(GetFont(), BP().itemlevelFontSize or 12, (EUI.SlugFlag and EUI.SlugFlag("OUTLINE, SLUG")) or "OUTLINE")
-    local lvl = it.gear and BP().showItemlevelInBags ~= false and C_Item.GetDetailedItemLevelInfo(it.link)
+    local lvl = it.gear and BP().showItemlevelInBags ~= false and C_Item.GetDetailedItemLevelInfo(it.str)
     if lvl and lvl > 1 then
         b.Level:SetText(lvl)
         b.Level:SetTextColor(1, 1, 1)
@@ -561,8 +591,67 @@ local function PaintGold(v, gold)
     end
 end
 
-Paint = function(v)
+-- the gold for whoever's showing (the gold ledger keeps everyone's)
+local function Gold(v)
+    local GL = EUI.GetGoldLedger and EUI.GetGoldLedger()
+    if not GL then return nil end
+    if v.mode == "bank" and TabKind(v) == "warband" then return GL.WarbandMoney() end
+    local key = ShownKey(v)
+    if key == Offline.CurrentKey() then return GL.Money() end
+    local e = GL.Data().chars[key]
+    return e and e.money
+end
+
+-- category edits bump this, so a paint knows the grouping moved
+local catGen = 0
+do
+    local CM = _G.EUI_CategoryManager
+    for _, m in ipairs({ "InitCategories", "SaveState", "RenameCategory", "ReorderCategory", "GroupCategories",
+        "AddToGroup", "UngroupCategory", "DisbandGroup", "RenameGroup", "AddCustomCategory", "RemoveCustomCategory",
+        "AssignItem", "UnassignItem", "ToggleJunk", "OnJunkChanged", "OnEquipmentSetsChanged" }) do
+        if CM and type(CM[m]) == "function" then hooksecurefunc(CM, m, function() catGen = catGen + 1 end) end
+    end
+end
+
+-- everything a paint draws from; the same signature twice means nothing moved
+local function Signature(v, list, query, gold, age)
+    local p = BP()
+    local sel, group = ns.GetSelection()
+    local dis = ""
+    for k in pairs(p.bagDisabledCategories or _emptyP) do dis = dis .. k .. "," end
+    local r, g, b = 0, 0, 0
+    if EUI.GetAccentColor then r, g, b = EUI.GetAccentColor() end
+    return strjoin("|", tostring(v.mode), tostring(list), Offline.Rev(), query, v.viewTab, tostring(sel),
+        tostring(group), math.floor(v.panel:GetWidth() + 0.5), catGen, GetFont(), tostring(gold), tostring(age),
+        tostring(p.bagItemIconZoom), tostring(p.bagCountFontSize), tostring(p.itemlevelFontSize),
+        tostring(p.showItemlevelInBags), tostring(p.bagQualityBorder), tostring(p.bagCatTitleSize),
+        tostring(p.bankSidebarCollapsed), tostring(p.bankHideTabsInSidebar), tostring(p.bankCategorySidebar),
+        tostring(ns.BankDefaultsToOne and ns.BankDefaultsToOne()), dis, r, g, b)
+end
+
+-- the slot count in the window header (the live refresh keeps resetting it)
+local function PaintCount(v)
+    local count = v.count and v.count()
+    if count and v.countText then
+        v.painting = true
+        count:SetText(v.countText)
+        v.painting = false
+    end
+end
+
+-- force: paint even if the signature didn't change (item data landed)
+Paint = function(v, force)
     if not (v.panel and v.panel:IsShown()) then return end
+    local query = Query()
+    local filter = Filter(v)
+    local list, saved = Containers(v)
+    local gold, age = Gold(v), Age(saved)
+    local sig = Signature(v, list, query, gold, age)
+    if not force and sig == v.sig then
+        PaintCount(v)
+        return
+    end
+    v.sig = sig
     PaintTabs(v)
 
     local width = v.panel:GetWidth()
@@ -572,10 +661,7 @@ Paint = function(v)
     local titleSize = BP().bagCatTitleSize or 11
 
     waiting = false
-    local query = Query(v)
-    local filter = Filter(v)
-    local list, saved = Containers(v)
-    local items, used, total = Collect(list, query, filter)
+    local items, used, total = Collect(list, v.mode == "bags", query, filter)
     local y, shown, nh = -6, 0, 0
     if list then
         local groups = Group(items)
@@ -631,21 +717,6 @@ Paint = function(v)
     v.empty:SetShown(empty ~= nil)
 
     -- saved time and gold on the bar; slots in the window header
-    local key = ShownKey(v)
-    local warband = v.mode == "bank" and TabKind(v) == "warband"
-    local GL = EUI.GetGoldLedger and EUI.GetGoldLedger()
-    local gold
-    if Offline.UsingSyndicator() then
-        local src = warband and Offline.Warband() or Offline.Char(key)
-        gold = src and src.money
-    elseif warband then
-        gold = GL and GL.WarbandMoney()
-    elseif GL then
-        local e = GL.Data().chars[key]
-        gold = e and e.money
-        if key == Offline.CurrentKey() then gold = GL.Money() end
-    end
-    local age = Age(saved)
     v.info:SetText(age and EllesmereUI.Lf("Saved %1$s", age) or "")
     PaintGold(v, gold)
 
@@ -657,12 +728,7 @@ Paint = function(v)
     end
     v.countText = text
     if v.side then PaintSide(v) end
-    local count = v.count and v.count()
-    if count then
-        v.painting = true
-        count:SetText(text)
-        v.painting = false
-    end
+    PaintCount(v)
 end
 
 -- item data landing, or the store changing under an open view
@@ -671,22 +737,20 @@ local function Soon(v)
     v.repaint = true
     C_Timer.After(0.2, function()
         v.repaint = false
-        -- an alt's sidebar counts come from these same items
-        if v == bagsView and AltKey(v) and EUI_Bags:IsVisible() and EUI_Bags.RefreshInventory then
-            EUI_Bags:RefreshInventory()
-        else
-            Paint(v)
-        end
+        if not (v.panel and v.panel:IsVisible()) then return end
+        -- an alt's sidebar counts come from these same items: just the sidebar, not a full refresh
+        if v == bagsView and AltKey(v) and I.BuildSidebarButtons then I.BuildSidebarButtons(ns.OfflineCounts()) end
+        Paint(v, true)
     end)
 end
 local ev = CreateFrame("Frame")
 ev:SetScript("OnEvent", function()
     if not waiting then return end
-    for _, v in ipairs(views) do if v.panel and v.panel:IsShown() then Soon(v) end end
+    for _, v in ipairs(views) do if v.panel and v.panel:IsVisible() then Soon(v) end end
 end)
 local function SyncEvents()
     for _, v in ipairs(views) do
-        if v.panel and v.panel:IsShown() then ev:RegisterEvent("GET_ITEM_INFO_RECEIVED"); return end
+        if v.panel and v.panel:IsVisible() then ev:RegisterEvent("GET_ITEM_INFO_RECEIVED"); return end
     end
     ev:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
 end
@@ -694,7 +758,7 @@ end
 -- saves don't repaint anything
 Offline.OnChange(function(what)
     if what == "bags" then return end
-    for _, v in ipairs(views) do if v.panel and v.panel:IsShown() then Soon(v) end end
+    for _, v in ipairs(views) do if v.panel and v.panel:IsVisible() then Soon(v) end end
 end)
 
 -- the window's own content under the panel: faded out, never hidden or moved
@@ -705,12 +769,13 @@ local function Cover(v, on)
 end
 
 -- show the panel over a window's item area, or hide it
-local function Place(v, mode, left, top, bottom)
+Place = function(v, mode, left, top, bottom)
     v.mode = mode
     Cover(v, mode ~= nil)
     if v.side then v.side:SetShown(mode ~= nil) end
     if not mode then
         if v.panel then v.panel:Hide() end
+        v.sig = nil
         SyncEvents()
         return
     end
@@ -729,11 +794,15 @@ end
 --  bags: hooked into the bags refresh
 -------------------------------------------------------------------------------
 bagsView.count = function() return EUI_Bags.Header and EUI_Bags.Header.itemCount end
-bagsView.under = function() return { EUI_Bags._scrollFrame, EUI_Bags._scrollTrack } end
+-- the list display's column bar too, or its labels show through the panel's bar
+bagsView.under = function() return { EUI_Bags._scrollFrame, EUI_Bags._scrollTrack, ns.ListHeaderBar and ns.ListHeaderBar(EUI_Bags) } end
 bagsView.goldRef = function() return EUI_Bags.Money end
 
--- runs after every bags refresh: covers the items while bank is picked or an
--- alt is showing, hidden otherwise. sidebarW is the sidebar's width.
+-- an alt or bank is up in the bags: no live items under it, so select modes stay off
+function ns.OfflineUp() return bagsView.mode ~= nil end
+
+-- runs after every bags refresh: covers the item area while bank is picked or
+-- an alt is showing, hidden otherwise. sidebarW is the sidebar's width.
 function ns.OfflinePanel(sidebarW)
     local hdr = EUI_Bags.Header
     -- off: nothing to do unless it was on earlier and needs tidying up
@@ -746,7 +815,7 @@ function ns.OfflinePanel(sidebarW)
     end
     SyncTitle(bagsView, hdr and hdr.title, hdr and hdr.itemCount)
     local mode
-    if ns.GetSelection() == BANK_VIEW and Offline.Enabled() then
+    if ns.GetSelection() == BANK_VIEW then
         mode = "bank"
     elseif AltKey(bagsView) then
         mode = "bags"
@@ -763,7 +832,9 @@ local EUI_Bank = bankView.win
 if EUI_Bank then
     bankView.count = function() return EUI_Bank._headerItemCount end
     bankView.goldRef = function() return EUI_Bank._warbandGoldText end
-    bankView.under = function() return { EUI_Bank._scrollFrame, EUI_Bank._scrollTrack, EUI_Bank._sidebarSF } end
+    bankView.under = function()
+        return { EUI_Bank._scrollFrame, EUI_Bank._scrollTrack, EUI_Bank._sidebarSF, ns.ListHeaderBar and ns.ListHeaderBar(EUI_Bank) }
+    end
 
     -- the alt's tabs over the live sidebar list (header and arrow stay live), styled the same
     local ROW_H, ROW_PAD, ICON = 26, 2, 18
@@ -811,7 +882,7 @@ if EUI_Bank then
 
     local function Used(t)
         local n = 0
-        for _ in pairs(type(t) == "table" and type(t.links) == "table" and t.links or {}) do n = n + 1 end
+        for _ in pairs(type(t) == "table" and type(t.items) == "table" and t.items or {}) do n = n + 1 end
         return n
     end
 
@@ -922,6 +993,12 @@ if EUI_Bank then
         -- between the window's header and footer, right of the sidebar
         local _, _, _, left, top = sf:GetPoint(1)
         local _, _, _, _, bottom = sf:GetPoint(2)
+        -- the list display's column bar sits above the scroll area: cover it too so it can't be clicked
+        local bar = ns.ListHeaderBar and ns.ListHeaderBar(EUI_Bank)
+        if bar and bar:IsShown() then
+            local _, _, _, _, barTop = bar:GetPoint(1)
+            if barTop then top = barTop end
+        end
         Place(bankView, AltKey(bankView) and "bank" or nil, left or 0, -(top or -30), bottom or 30)
     end
 
@@ -944,7 +1021,8 @@ else
     SyncBank = function() end
 end
 
--- option toggled off: leave the bank view for all items and go back to this character
+-- option toggled: off leaves the bank view for all items and goes back to
+-- this character; either way the bank sidebar switches layout
 function Offline.SyncButton()
     if not (EUI_Bags and EUI_Bags.RefreshInventory) then return end
     if not Offline.Enabled() then
@@ -952,5 +1030,5 @@ function Offline.SyncButton()
         if ns.GetSelection() == BANK_VIEW then I.SetSelectedCategoryIndex(0) end
     end
     if EUI_Bags:IsVisible() then EUI_Bags:RefreshInventory() end
-    SyncBank()
+    if EUI_Bank and EUI_Bank:IsShown() and EUI_Bank.RefreshBank then EUI_Bank:RefreshBank() else SyncBank() end
 end

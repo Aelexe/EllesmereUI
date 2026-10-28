@@ -250,6 +250,7 @@ end
 -- header, the footer or outside the window; the scroll frame only clips them).
 -- Cursor / each button's OWN effective scale: GetRect() is in button units.
 function ns.SelectSlotUnderCursor()
+    if ns.OfflineUp and ns.OfflineUp() then return nil end  -- an alt's items aren't real slots
     local sf = EUI_Bags._scrollFrame
     if not (sf and sf:IsMouseOver()) then return nil end
     local rawCx, rawCy = GetCursorPosition()
@@ -295,6 +296,7 @@ end
 -- junk: Junk Marker mode -- clicks toggle marks, the mode stays open, and only
 -- the bag window dims (the "+" assign dims the whole screen).
 EnterAssignSelectMode = function(catKey, junk)
+    if ns.OfflineUp and ns.OfflineUp() then return end  -- nothing live to pick while an alt or bank is up
     EUI_Bags._assignSelectMode = true
     EUI_Bags._junkMode = junk or nil
     _assignSelectCatKey = catKey
@@ -724,6 +726,7 @@ end
 end -- Junk Marker
 
 EnterPinSelectMode = function()
+    if ns.OfflineUp and ns.OfflineUp() then return end
     EUI_Bags._pinSelectMode = true
 
     -- Dark overlay covers the entire screen including bags
