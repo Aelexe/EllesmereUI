@@ -225,6 +225,7 @@ SetBankFont(title, 13)
 title:SetPoint("LEFT", header, "LEFT", 8, 0)
 title:SetTextColor(1, 1, 1)
 title:SetText(EllesmereUI.L("Bank"))
+EUI_Bank._headerTitle = title  -- the Offline Bank character picker (EllesmereUIBags_OfflineView.lua)
 
 local itemCount = header:CreateFontString(nil, "OVERLAY")
 SetBankFont(itemCount, 11)
