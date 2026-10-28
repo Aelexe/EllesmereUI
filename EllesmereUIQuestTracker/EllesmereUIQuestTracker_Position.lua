@@ -11,7 +11,34 @@ local EQT = ns.EQT
 local HEIGHT_MIN, HEIGHT_MAX, HEIGHT_STEP = 400, 1000, 10
 
 local emAnchor = { relativeTo = "UIParent" }
-local hooked, presetWarned, reloadOffered, resetPending, syncQueued
+local hooked, changed, reloadOffered, resetPending, syncQueued, standIn, standInPlaced
+
+-- Until its Edit Mode layout applies, the managed container places it.
+local function Held()
+    local f = _G.ObjectiveTrackerFrame
+    return not f:IsInitialized() or f:IsInDefaultPosition()
+end
+
+-- The container puts a held tracker back in its slot on every tracker
+-- update, so an unlock session moves a stand-in of the moved tracker's size.
+local function UnlockFrame()
+    local f = _G.ObjectiveTrackerFrame
+    if not (EllesmereUI._unlockActive and Held()) then return f end
+    if not standInPlaced then
+        standInPlaced = true
+        local cfg = EQT.DB()
+        standIn = standIn or CreateFrame("Frame", nil, UIParent)
+        standIn:SetSize(f:GetWidth(), cfg.height or f.editModeHeight or 800)
+        standIn:ClearAllPoints()
+        local pos = cfg.position
+        if pos then
+            standIn:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, pos.x, pos.y)
+        elseif f:GetLeft() then
+            standIn:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", f:GetLeft(), f:GetTop())
+        end
+    end
+    return standIn
+end
 
 -- The merged layout list, the active layout and its tracker entry, and
 -- whether that layout is a read-only preset. nil while Edit Mode is open or
@@ -116,8 +143,6 @@ local function OfferReload()
 end
 
 local function WarnPreset()
-    if presetWarned then return end
-    presetWarned = true
     EllesmereUI:ShowConfirmPopup({
         title = "Copy Your Edit Mode Layout",
         message = "Your active Edit Mode layout is one of Blizzard's presets, which cannot be changed. Copy it in Edit Mode, then move the quest tracker again.",
@@ -128,7 +153,8 @@ end
 function EQT.SyncPosition()
     syncQueued = nil
     local cfg = EQT.DB()
-    if not cfg.position or EllesmereUI._unlockActive then return end
+    -- Leaving Edit Mode re-applies the layout, which syncs again.
+    if not cfg.position or EllesmereUI._unlockActive or EllesmereUI.EditModeOpen() then return end
     if InCombatLockdown() then
         ns.CombatQueue.Defer("QTPosition", EQT.SyncPosition)
         return
@@ -143,8 +169,10 @@ function EQT.SyncPosition()
             C_Timer.After(0, EQT.SyncPosition)
         end)
     end
+    local userChange = changed
+    changed = nil
     if WriteLayout(cfg) == "preset" then
-        WarnPreset()
+        if userChange then WarnPreset() end
         return
     end
     local f = _G.ObjectiveTrackerFrame
@@ -180,25 +208,28 @@ function EQT.InitPosition()
             label = "Quest Tracker",
             group = "Quest Tracker",
             order = 560,
-            getFrame = function() return _G.ObjectiveTrackerFrame end,
+            getFrame = UnlockFrame,
             getSize  = function()
-                local f = _G.ObjectiveTrackerFrame
+                local f = UnlockFrame()
                 return f:GetWidth(), EQT.DB().height or f:GetHeight()
             end,
             isHidden = function() return not EQT.Cfg("enabled") end,
-            -- Until its Edit Mode layout applies, the managed container places it.
-            isPositionHeld = function()
-                local f = _G.ObjectiveTrackerFrame
-                return not f:IsInitialized() or f:IsInDefaultPosition()
-            end,
+            isPositionHeld = Held,
             setHeight = function(_, h)
                 h = math.floor(h / HEIGHT_STEP + 0.5) * HEIGHT_STEP
-                EQT.Set("height", math.max(HEIGHT_MIN, math.min(HEIGHT_MAX, h)))
-                if not EllesmereUI._unlockActive then EQT.SyncPosition() end
+                h = math.max(HEIGHT_MIN, math.min(HEIGHT_MAX, h))
+                EQT.Set("height", h)
+                if standInPlaced then standIn:SetHeight(h) end
+                if EllesmereUI._unlockActive then changed = true else EQT.SyncPosition() end
             end,
+            -- Saved by its top edge: the tracker grows down, and a moved
+            -- tracker takes its Height setting.
             savePos = function(_, point, relPoint, x, y)
+                if point == "CENTER" then
+                    point, relPoint, y = "TOP", "CENTER", y + UnlockFrame():GetHeight() / 2
+                end
                 EQT.Set("position", { point = point, relPoint = relPoint or point, x = x, y = y })
-                if not EllesmereUI._unlockActive then EQT.SyncPosition() end
+                if EllesmereUI._unlockActive then changed = true else EQT.SyncPosition() end
             end,
             loadPos = function() return EQT.Cfg("position") end,
             clearPos = function()
@@ -215,8 +246,11 @@ function EQT.InitPosition()
     }, "EllesmereUIQuestTracker")
 
     -- Layout writes and reload prompts wait for the session to close.
-    EllesmereUI:RegisterUnlockModeListener("EllesmereUIQuestTracker", function(active)
+    EllesmereUI:RegisterUnlockModeListener("EllesmereUIQuestTracker", function(active, closeAction)
         if active then return end
+        standInPlaced = nil
+        -- Exiting without saving put the old spot and height back.
+        if closeAction ~= "save" then changed = nil end
         if resetPending then ApplyReset() end
         EQT.SyncPosition()
     end)
