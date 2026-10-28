@@ -1,14 +1,14 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  EllesmereUIBags_OfflineView.lua
---  Offline Bank viewer: any saved character's bags or bank, or the warband
---  bank, from anywhere (data from EllesmereUIBags_Offline.lua). Looks like the
+--  Offline Bank viewer: any saved character's bank, or the warband bank,
+--  from anywhere (data from EllesmereUIBags_Offline.lua). Looks like the
 --  bank window, but its item buttons are plain display buttons: they never
 --  touch a real bag slot, so the window is safe to open at any time, combat
 --  included. Hover for the item tooltip; Shift-click links, Ctrl-click
 --  previews (HandleModifiedItemClick).
 --
---  Opened from the Bank icon in the bags header (EUI_Bags:SyncHeaderIcons);
+--  Opened from Bank in the bags sidebar (EUI_Bags_Sidebar.lua) or /euibank;
 --  at a banker the live bank window is the one that shows.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
@@ -26,16 +26,6 @@ local HEADER_H, FOOTER_H, PAD = 35, 28, 10
 local ITEM_CLASS_WEAPON, ITEM_CLASS_ARMOR = Enum.ItemClass.Weapon, Enum.ItemClass.Armor
 
 local function GetFont() return EUI.GetFontPath("bags") end
--- an atlas when the client has it, else the fallback texture (or nothing)
-local function Atlas(tex, name, fallback)
-    if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(name) then
-        tex:SetAtlas(name)
-    elseif fallback then
-        tex:SetTexture(fallback)
-    else
-        tex:Hide()
-    end
-end
 local function SetFont(fs, size)
     EUI.PrimeFontShadow(fs, true)
     fs:SetFont(GetFont(), size, EUI.GetFontOutlineFlag("bags"))
@@ -45,7 +35,7 @@ local function Height() return BP().bankHeight or 500 end
 
 -- what's showing
 local viewKey     -- character key
-local viewTab = "bank"  -- "bags" | "bank" | "warband"
+local viewTab = "bank"  -- "bank" | "warband"
 local query = ""
 
 -------------------------------------------------------------------------------
@@ -184,16 +174,23 @@ local function Build()
     SetFont(who.text, 13)
     who.text:SetPoint("LEFT", 6, 0)
     who.arrow = who:CreateTexture(nil, "OVERLAY")
-    Atlas(who.arrow, "common-dropdown-a-button-open")
-    who.arrow:SetSize(12, 12)
-    who.arrow:SetPoint("LEFT", who.text, "RIGHT", 4, -1)
+    who.arrow:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-arrow-down3.png")
+    who.arrow:SetSize(10, 10)
+    who.arrow:SetPoint("LEFT", who.text, "RIGHT", 5, 0)
+    who.arrow:SetAlpha(0.7)
     who:SetScript("OnClick", function(self) OpenPicker(self) end)
-    who:SetScript("OnEnter", function(self) EUI.ShowWidgetTooltip(self, EllesmereUI.L("Choose a character")) end)
-    who:SetScript("OnLeave", function() EUI.HideWidgetTooltip() end)
+    who:SetScript("OnEnter", function(self)
+        self.arrow:SetAlpha(1)
+        EUI.ShowWidgetTooltip(self, EllesmereUI.L("Choose a character"))
+    end)
+    who:SetScript("OnLeave", function(self)
+        self.arrow:SetAlpha(0.7)
+        EUI.HideWidgetTooltip()
+    end)
     header.who = who
 
     local prev = who
-    for _, d in ipairs({ { EllesmereUI.L("Bags"), "bags" }, { EllesmereUI.L("Bank"), "bank" }, { EllesmereUI.L("Warband"), "warband" } }) do
+    for _, d in ipairs({ { EllesmereUI.L("Bank"), "bank" }, { EllesmereUI.L("Warband"), "warband" } }) do
         local t = TabButton(d[1], d[2])
         t:SetPoint("LEFT", prev, "RIGHT", prev == who and 8 or 0, 0)
         tabs[#tabs + 1] = t
@@ -354,7 +351,6 @@ local function Containers()
     end
     local c = Offline.Char(viewKey)
     if not c then return nil end
-    if viewTab == "bags" then return c.bags, c.bagsTime end
     return c.bank, c.bankTime
 end
 
@@ -487,10 +483,8 @@ Refresh = function()
     if not list then
         if viewTab == "warband" then
             empty = EllesmereUI.L("The warband bank hasn't been saved yet. Open it once at a banker.")
-        elseif viewTab == "bank" then
-            empty = EllesmereUI.L("This character's bank hasn't been saved yet. Visit a banker on this character.")
         else
-            empty = EllesmereUI.L("This character's bags haven't been saved yet.")
+            empty = EllesmereUI.L("This character's bank hasn't been saved yet. Visit a banker on this character.")
         end
     elseif shown == 0 then
         empty = query ~= "" and EllesmereUI.L("No items match your search.") or EllesmereUI.L("No Items")
@@ -546,48 +540,10 @@ function Offline.Toggle(tab)
     if win and win:IsShown() then win:Hide() else Offline.Show(tab) end
 end
 
--- the Bank icon in the bags header, after Show Bags (EUI_Bags:SyncHeaderIcons)
-local function BuildIcon()
-    local b = CreateFrame("Button", nil, EUI_Bags._bagsBtn:GetParent())
-    b:SetSize(24, 24)
-    b.icon = b:CreateTexture(nil, "OVERLAY")
-    Atlas(b.icon, "Banker", "Interface\\Icons\\INV_Misc_Coin_02")
-    b.icon:SetSize(20, 20)
-    b.icon:SetPoint("CENTER")
-    b.icon:SetAlpha(0.9)
-    b:SetScript("OnEnter", function(self)
-        self.icon:SetAlpha(1)
-        EUI.ShowWidgetTooltip(self, EllesmereUI.L("Bank, other characters and the warband bank, from anywhere."))
-    end)
-    b:SetScript("OnLeave", function(self)
-        self.icon:SetAlpha(0.9)
-        EUI.HideWidgetTooltip()
-    end)
-    b:SetScript("OnClick", function()
-        EUI.HideWidgetTooltip()
-        -- at a banker the live bank is the real one
-        local bank = _G.EUI_BankFrame
-        if bank and bank:IsShown() then return end
-        Offline.Toggle("bank")
-    end)
-    EUI_Bags._offlineBtn = b
-end
-
-function ns.SyncOfflineIcon(prev, gap)
-    local on = Offline.Enabled()
-    if on and not EUI_Bags._offlineBtn and EUI_Bags._bagsBtn then BuildIcon() end
-    local b = EUI_Bags._offlineBtn
-    if not b then return nil end
-    b:ClearAllPoints()
-    b:SetPoint("RIGHT", prev, "LEFT", -gap, 0)
-    b:SetShown(on)
-    if not on and win then win:Hide() end
-    return on and b or nil
-end
-
--- the option toggled: the icon follows
+-- the option toggled: the sidebar's Bank entry follows
 function Offline.SyncButton()
-    if EUI_Bags and EUI_Bags._bagsBtn and EUI_Bags.SyncHeaderIcons then EUI_Bags:SyncHeaderIcons() end
+    if not Offline.Enabled() and win then win:Hide() end
+    if EUI_Bags and EUI_Bags:IsVisible() and EUI_Bags.RefreshInventory then EUI_Bags:RefreshInventory() end
 end
 
 -- /euibank opens it too
