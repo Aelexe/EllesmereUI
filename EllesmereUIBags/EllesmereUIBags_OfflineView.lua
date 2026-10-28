@@ -116,7 +116,24 @@ end
 --  the title: an alt button, then "Name's Inventory" (or "Name's Bank") for
 --  whoever's showing.
 -------------------------------------------------------------------------------
--- realm headers (only with more than one realm), then forget
+-- delete an alt's saves, asked first. either window showing them goes back
+-- to this character
+local function AskForget(c)
+    EUI:ShowConfirmPopup({
+        title       = "Delete Saved Data",
+        message     = EllesmereUI.Lf("Delete %s's saved bags and bank? They come back the next time you log into that character.", c.name),
+        confirmText = "Delete",
+        cancelText  = "Cancel",
+        onConfirm   = function()
+            Offline.Forget(c.key)
+            for _, w in ipairs(views) do
+                if w.key == c.key then w.key = nil; Rebuild(w) end
+            end
+        end,
+    })
+end
+
+-- realm headers (only with more than one realm), each alt with an x to delete it
 local function OpenPicker(v, owner)
     if not EUI.ShowContextMenu then return end
     local items, realm = {}, nil
@@ -134,19 +151,12 @@ local function OpenPicker(v, owner)
             onClick = function()
                 v.key = not c.current and c.key or nil
                 Rebuild(v)
-            end }
+            end,
+            onRemove = not c.current and function() AskForget(c) end or nil,
+            removeTip = EllesmereUI.L("Delete saved data") }
     end
     if #chars < 2 then
         items[#items + 1] = { text = EllesmereUI.L("No other characters saved yet."), noLoc = true, isDisabled = Off }
-    end
-    local c = v.key and Offline.Char(v.key)
-    if c and Offline.CanForget(v.key) then
-        items[#items + 1] = "---"
-        items[#items + 1] = { text = EllesmereUI.Lf("Forget %1$s", c.name or v.key), noLoc = true, onClick = function()
-            Offline.Forget(v.key)
-            v.key = nil
-            Rebuild(v)
-        end }
     end
     EUI.ShowContextMenu(owner, items, { below = true, fontKey = "bags" })
 end

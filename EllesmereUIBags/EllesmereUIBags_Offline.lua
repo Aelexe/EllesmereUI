@@ -149,6 +149,14 @@ local function MyEntry()
     if not c then c = {}; chars[key] = c end
     local _, class = UnitClass("player")
     c.name, c.realm, c.class, c.level = UnitName("player"), EUI.RealmGroupName(), class, UnitLevel("player")
+    -- renamed or moved realms: same guid under the old key, drop that one
+    local guid = UnitGUID("player")
+    if guid and c.guid ~= guid then
+        c.guid = guid
+        for k, o in pairs(chars) do
+            if k ~= key and type(o) == "table" and o.guid == guid then chars[k] = nil end
+        end
+    end
     return c
 end
 
