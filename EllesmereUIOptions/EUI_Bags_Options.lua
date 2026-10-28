@@ -165,7 +165,7 @@ initFrame:SetScript("OnEvent", function(self)
                     _, h = W:SectionHeader(parent, "OFFLINE BANK", y); y = y - h
                     _, h = W:DualRow(parent, y,
                         { type="toggle", text="Offline Bank",
-                          tooltip="Saves each character's bags and bank, and the warband bank, when you see them. Bank in the bags sidebar then shows any of your characters' banks and the warband bank from anywhere.",
+                          tooltip="Saves each character's bags and bank, and the warband bank, when you see them. Click the name in the bags title to see another character's bags, and Bank in the bags sidebar for their bank or the warband bank, from anywhere.",
                           getValue=function() return db.profile.bagOfflineBank ~= false end,
                           setValue=function(v)
                               db.profile.bagOfflineBank = v and true or false

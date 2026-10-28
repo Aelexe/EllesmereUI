@@ -103,8 +103,11 @@ local function SynChar(key)
         local d = SynAPI().GetByCharacterFullName(key)
         local det = type(d) == "table" and d.details
         if type(det) ~= "table" then return nil end
+        -- its bags are plain slot lists; wrap them like tabs
+        local bags = {}
+        for _, slots in ipairs(type(d.bags) == "table" and d.bags or {}) do bags[#bags + 1] = { slots = slots } end
         return { name = det.character or key, realm = det.realm or det.realmNormalized or "",
-                 class = det.className, money = d.money, bank = SynTabs(d.bankTabs) }
+                 class = det.className, money = d.money, bags = SynTabs(bags), bank = SynTabs(d.bankTabs) }
     end)
 end
 

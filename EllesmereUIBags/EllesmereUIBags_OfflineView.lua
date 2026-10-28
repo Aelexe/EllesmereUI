@@ -1,15 +1,19 @@
 if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_ClientGate.lua)
 -------------------------------------------------------------------------------
 --  EllesmereUIBags_OfflineView.lua
---  Offline Bank view inside the bags window: Bank in the bags sidebar (the
---  selection -3, EUI_Bags_Sidebar.lua) shows any saved character's bank, or
---  the warband bank, from anywhere (data from EllesmereUIBags_Offline.lua).
+--  Offline Bank view inside the bags window (data from EllesmereUIBags_Offline
+--  .lua):
+--    * the window title reads "Name's Inventory" and drops down a list of
+--      saved characters; picking another one shows their bags, and the
+--      sidebar categories count and filter their items
+--    * Bank in the bags sidebar (the selection -3, EUI_Bags_Sidebar.lua)
+--      shows the picked character's bank, or the warband bank
 --
---  The view is a panel over the bags' item area (FinishRefresh in
+--  Both are a panel over the bags' item area (FinishRefresh in
 --  EUI_Bags_Refresh.lua calls ns.OfflinePanel after every refresh; the bags
---  paint no items while Bank is selected). Its item buttons are plain display
---  buttons: they never touch a real bag slot, so the view is safe at any time,
---  combat included. Hover for the item tooltip; Shift-click links, Ctrl-click
+--  paint no items under it). Its item buttons are plain display buttons:
+--  they never touch a real bag slot, so the view is safe at any time, combat
+--  included. Hover for the item tooltip; Shift-click links, Ctrl-click
 --  previews (HandleModifiedItemClick). The bags search box filters it too.
 -------------------------------------------------------------------------------
 local EUI = EllesmereUI
@@ -35,11 +39,24 @@ local function SetFont(fs, size)
 end
 
 -- what's showing
-local viewKey             -- character key
-local viewTab = "bank"    -- "bank" | "warband"
+local viewKey             -- another character picked in the title; nil = this one
+local viewTab = "bank"    -- "bank" | "warband" (the Bank view)
+local mode                -- "bags" (another character's bags) | "bank"
 
-local panel, bar, scroll, child
+local panel, bar, scroll, child, titleBtn
 local slots, heads, tabs = {}, {}, {}
+
+local function ShownKey() return viewKey or Offline.CurrentKey() end
+
+-- another character's bags are showing (nil while it's this character)
+function ns.OfflineAlt()
+    if not viewKey then return nil end
+    if not Offline.Enabled() or viewKey == Offline.CurrentKey() or not Offline.Char(viewKey) then
+        viewKey = nil
+        return nil
+    end
+    return viewKey
+end
 
 local function Hex(class)
     local c = class and C_ClassColor and C_ClassColor.GetClassColor(class)
@@ -67,9 +84,84 @@ local function Repaint()
     Paint()
 end
 
+local function RefreshBags()
+    if scroll then scroll:SetVerticalScroll(0) end
+    if EUI_Bags:IsVisible() and EUI_Bags.RefreshInventory then EUI_Bags:RefreshInventory() end
+end
+
 -------------------------------------------------------------------------------
---  The panel: a bar (character, Bank / Warband, gold and saved time) over a
---  scrolling grid
+--  The title: "Name's Inventory", a dropdown of the saved characters
+-------------------------------------------------------------------------------
+-- realms as titles, characters as radios, forget at the end
+local function OpenPicker(owner)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        local realm
+        for _, c in ipairs(Offline.Characters()) do
+            if c.realm ~= realm then
+                realm = c.realm
+                root:CreateTitle(realm)
+            end
+            root:CreateRadio(Hex(c.class) .. c.name .. "|r", function() return ShownKey() == c.key end, function()
+                viewKey = not c.current and c.key or nil
+                RefreshBags()
+            end)
+        end
+        local c = viewKey and Offline.Char(viewKey)
+        if c and Offline.CanForget(viewKey) then
+            root:CreateDivider()
+            root:CreateButton(EllesmereUI.Lf("Forget %1$s", c.name or viewKey), function()
+                Offline.Forget(viewKey)
+                viewKey = nil
+                RefreshBags()
+            end)
+        end
+    end)
+end
+
+local function SyncTitle()
+    local hdr = EUI_Bags.Header
+    if not (hdr and hdr.title and hdr.itemCount) then return end
+    local on = Offline.Enabled()
+    if on and not titleBtn then
+        titleBtn = CreateFrame("Button", nil, hdr)
+        titleBtn:SetPoint("TOPLEFT", hdr.title, "TOPLEFT", -4, 4)
+        titleBtn:SetPoint("BOTTOMLEFT", hdr.title, "BOTTOMLEFT", -4, -4)
+        titleBtn.arrow = titleBtn:CreateTexture(nil, "OVERLAY")
+        titleBtn.arrow:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-arrow-down3.png")
+        titleBtn.arrow:SetSize(10, 10)
+        titleBtn.arrow:SetPoint("LEFT", hdr.title, "RIGHT", 5, 0)
+        titleBtn.arrow:SetAlpha(0.7)
+        titleBtn:SetScript("OnClick", function(self) OpenPicker(self) end)
+        titleBtn:SetScript("OnEnter", function(self)
+            self.arrow:SetAlpha(1)
+            EUI.ShowWidgetTooltip(self, EllesmereUI.L("Choose a character"))
+        end)
+        titleBtn:SetScript("OnLeave", function(self)
+            self.arrow:SetAlpha(0.7)
+            EUI.HideWidgetTooltip()
+        end)
+    end
+    if titleBtn then titleBtn:SetShown(on) end
+    hdr.itemCount:ClearAllPoints()
+    if on then
+        local c = Offline.Char(ShownKey())
+        local name = (c and c.name) or UnitName("player") or ""
+        local class = (c and c.class) or select(2, UnitClass("player"))
+        hdr.title:SetText(EllesmereUI.Lf("%1$s's Inventory", Hex(class) .. name .. "|r"))
+        titleBtn:SetWidth(hdr.title:GetStringWidth() + 23)
+        hdr.itemCount:SetPoint("LEFT", titleBtn.arrow, "RIGHT", 8, 0)
+    else
+        hdr.title:SetText(EllesmereUI.L("Inventory"))
+        hdr.itemCount:SetPoint("LEFT", hdr.title, "RIGHT", 8, 0)
+    end
+end
+
+-- closing the bags goes back to this character
+EUI_Bags:HookScript("OnHide", function() viewKey = nil end)
+
+-------------------------------------------------------------------------------
+--  The panel: a bar (Bank / Warband, gold and saved time) over a scrolling grid
 -------------------------------------------------------------------------------
 local function TabButton(text, key)
     local b = CreateFrame("Button", nil, bar)
@@ -98,34 +190,8 @@ local function PaintTabs()
         t.text:SetTextColor(on and 1 or 0.6, on and 1 or 0.6, on and 1 or 0.6)
         t.line:SetColorTexture(r, g, b, 1)
         t.line:SetShown(on)
+        t:SetShown(mode == "bank")
     end
-end
-
--- the character picker: realms as titles, characters as radios, forget at the end
-local function OpenPicker(owner)
-    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
-        local realm
-        for _, c in ipairs(Offline.Characters()) do
-            if c.realm ~= realm then
-                realm = c.realm
-                root:CreateTitle(realm)
-            end
-            root:CreateRadio(Hex(c.class) .. c.name .. "|r", function() return viewKey == c.key end, function()
-                viewKey = c.key
-                Repaint()
-            end)
-        end
-        local c = Offline.Char(viewKey)
-        if c and Offline.CanForget(viewKey) then
-            root:CreateDivider()
-            root:CreateButton(EllesmereUI.Lf("Forget %1$s", c.name or viewKey), function()
-                Offline.Forget(viewKey)
-                viewKey = Offline.CurrentKey()
-                Repaint()
-            end)
-        end
-    end)
 end
 
 local function Build()
@@ -156,32 +222,10 @@ local function Build()
     sep:SetPoint("BOTTOMRIGHT")
     sep:SetColorTexture(0.15, 0.15, 0.15, 1)
 
-    local who = CreateFrame("Button", nil, bar)
-    who:SetHeight(BAR_H)
-    who:SetPoint("LEFT", 4, 0)
-    who.text = who:CreateFontString(nil, "OVERLAY")
-    SetFont(who.text, 12)
-    who.text:SetPoint("LEFT", 6, 0)
-    who.arrow = who:CreateTexture(nil, "OVERLAY")
-    who.arrow:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-arrow-down3.png")
-    who.arrow:SetSize(10, 10)
-    who.arrow:SetPoint("LEFT", who.text, "RIGHT", 5, 0)
-    who.arrow:SetAlpha(0.7)
-    who:SetScript("OnClick", function(self) OpenPicker(self) end)
-    who:SetScript("OnEnter", function(self)
-        self.arrow:SetAlpha(1)
-        EUI.ShowWidgetTooltip(self, EllesmereUI.L("Choose a character"))
-    end)
-    who:SetScript("OnLeave", function(self)
-        self.arrow:SetAlpha(0.7)
-        EUI.HideWidgetTooltip()
-    end)
-    bar.who = who
-
-    local prev = who
+    local prev
     for _, d in ipairs({ { EllesmereUI.L("Bank"), "bank" }, { EllesmereUI.L("Warband"), "warband" } }) do
         local t = TabButton(d[1], d[2])
-        t:SetPoint("LEFT", prev, "RIGHT", prev == who and 8 or 0, 0)
+        if prev then t:SetPoint("LEFT", prev, "RIGHT", 0, 0) else t:SetPoint("LEFT", 6, 0) end
         tabs[#tabs + 1] = t
         prev = t
     end
@@ -280,19 +324,34 @@ end
 -------------------------------------------------------------------------------
 -- the containers behind the current view, and when they were saved
 local function Containers()
-    if viewTab == "warband" then
+    if mode == "bank" and viewTab == "warband" then
         local w = Offline.Warband()
         return w.tabs, w.time
     end
-    local c = Offline.Char(viewKey)
+    local c = Offline.Char(ShownKey())
     if not c then return nil end
+    if mode == "bags" then return c.bags, c.bagsTime end
     return c.bank, c.bankTime
 end
 
 local waiting = false  -- item data asked for; one repaint when it lands
 
--- the saved items as display entries
-local function Collect(list, query)
+-- the bags' category for an item; disabled categories go to the catch-all
+local function Classify(link, id, q)
+    local mgr = _G.EUI_CategoryManager
+    local cats = mgr and mgr:GetCategories()
+    if not cats then return 0 end
+    local catchAll
+    for i, cat in ipairs(cats) do if cat.isCatchAll then catchAll = i end end
+    local idx = mgr:ClassifyItem(link, id, nil, nil, q) or catchAll or #cats
+    local cat = cats[idx]
+    local disabled = BP().bagDisabledCategories or _emptyP
+    if cat and cat._defaultName and disabled[cat._defaultName] and catchAll then idx = catchAll end
+    return idx
+end
+
+-- the saved items as display entries; only the categories in filter when given
+local function Collect(list, query, filter)
     local items, used, total = {}, 0, 0
     for _, t in ipairs(type(list) == "table" and list or {}) do
         if type(t) == "table" then
@@ -307,12 +366,15 @@ local function Collect(list, query)
                         waiting = true
                         if id then C_Item.RequestLoadItemDataByID(id) end
                     end
-                    local _, _, _, _, instIcon, classID = GetItemInfoInstant(link)
-                    items[#items + 1] = {
-                        link = link, id = id, name = name, q = q or 1, icon = icon or instIcon,
-                        n = (t.counts and t.counts[slot]) or 1,
-                        gear = classID == ITEM_CLASS_WEAPON or classID == ITEM_CLASS_ARMOR,
-                    }
+                    local cat = Classify(link, id, q or 1)
+                    if not filter or filter[cat] then
+                        local _, _, _, _, instIcon, classID = GetItemInfoInstant(link)
+                        items[#items + 1] = {
+                            link = link, id = id, name = name, q = q or 1, icon = icon or instIcon, cat = cat,
+                            n = (t.counts and t.counts[slot]) or 1,
+                            gear = classID == ITEM_CLASS_WEAPON or classID == ITEM_CLASS_ARMOR,
+                        }
+                    end
                 end
             end
         end
@@ -320,21 +382,37 @@ local function Collect(list, query)
     return items, used, total
 end
 
--- category per item, the bags' own order; disabled categories go to the catch-all
-local function Group(items)
+-- the sidebar's counts for the picked character's bags (EUI_Bags_Refresh.lua)
+function ns.OfflineCounts()
+    local c = Offline.Char(viewKey)
+    local counts, total = {}, 0
+    for _, it in ipairs((Collect(c and c.bags, ""))) do
+        counts[it.cat] = (counts[it.cat] or 0) + 1
+        total = total + 1
+    end
+    return counts, total
+end
+
+-- the sidebar selection as a category filter (nil = everything)
+local function Filter()
+    if mode ~= "bags" then return nil end
+    local sel, group = ns.GetSelection()
     local mgr = _G.EUI_CategoryManager
-    local cats = mgr and mgr:GetCategories()
-    if not cats then return { { name = EllesmereUI.L("Items"), items = items } } end
-    local disabled = BP().bagDisabledCategories or _emptyP
-    local catchAll
-    for i, cat in ipairs(cats) do if cat.isCatchAll then catchAll = i end end
+    if group and mgr then
+        local f = {}
+        for _, mi in ipairs(mgr:GetGroupMembers(group) or {}) do f[mi] = true end
+        return f
+    end
+    if sel and sel > 0 then return { [sel] = true } end
+end
+
+-- groups in the bags' own category order
+local function Group(items)
+    local cats = _G.EUI_CategoryManager and _G.EUI_CategoryManager:GetCategories() or {}
     local by = {}
     for _, it in ipairs(items) do
-        local idx = mgr:ClassifyItem(it.link, it.id, nil, nil, it.q) or catchAll or #cats
-        local cat = cats[idx]
-        if cat and cat._defaultName and disabled[cat._defaultName] and catchAll then idx = catchAll end
-        local g = by[idx]
-        if not g then g = { idx = idx, name = cats[idx] and cats[idx].name or EllesmereUI.L("Items"), items = {} }; by[idx] = g end
+        local g = by[it.cat]
+        if not g then g = { idx = it.cat, name = cats[it.cat] and cats[it.cat].name or EllesmereUI.L("Items"), items = {} }; by[it.cat] = g end
         g.items[#g.items + 1] = it
     end
     local groups = {}
@@ -373,10 +451,6 @@ end
 
 Paint = function()
     if not (panel and panel:IsShown()) then return end
-    if not Offline.Char(viewKey) then viewKey = Offline.CurrentKey() end
-    local c = Offline.Char(viewKey)
-    bar.who.text:SetText(c and (Hex(c.class) .. (c.name or viewKey) .. "|r") or (UnitName("player") or ""))
-    bar.who:SetWidth(bar.who.text:GetStringWidth() + 28)
     PaintTabs()
 
     local width = panel:GetWidth()
@@ -387,8 +461,9 @@ Paint = function()
 
     waiting = false
     local query = Query()
+    local filter = Filter()
     local list, saved = Containers()
-    local items, used, total = Collect(list, query)
+    local items, used, total = Collect(list, query, filter)
     local y, shown, nh = -6, 0, 0
     if list then
         for _, g in ipairs(Group(items)) do
@@ -419,7 +494,9 @@ Paint = function()
     -- nothing saved yet: say how to fill it
     local empty
     if not list then
-        if viewTab == "warband" then
+        if mode == "bags" then
+            empty = EllesmereUI.L("This character's bags haven't been saved yet. Log in on this character once.")
+        elseif viewTab == "warband" then
             empty = EllesmereUI.L("The warband bank hasn't been saved yet. Open it once at a banker.")
         else
             empty = EllesmereUI.L("This character's bank hasn't been saved yet. Visit a banker on this character.")
@@ -430,18 +507,20 @@ Paint = function()
     panel.empty:SetText(empty or "")
     panel.empty:SetShown(empty ~= nil)
 
-    -- gold and when it was saved, right of the tabs; slots in the bags header
+    -- gold and when it was saved, right of the bar; slots in the bags header
+    local key = ShownKey()
+    local warband = mode == "bank" and viewTab == "warband"
     local GL = EUI.GetGoldLedger and EUI.GetGoldLedger()
     local gold
     if Offline.UsingSyndicator() then
-        local src = viewTab == "warband" and Offline.Warband() or Offline.Char(viewKey)
+        local src = warband and Offline.Warband() or Offline.Char(key)
         gold = src and src.money
-    elseif viewTab == "warband" then
+    elseif warband then
         gold = GL and GL.WarbandMoney()
     elseif GL then
-        local e = GL.Data().chars[viewKey]
+        local e = GL.Data().chars[key]
         gold = e and e.money
-        if viewKey == Offline.CurrentKey() then gold = GL.Money() end
+        if key == Offline.CurrentKey() then gold = GL.Money() end
     end
     local parts = {}
     local age = Age(saved)
@@ -450,7 +529,13 @@ Paint = function()
     bar.info:SetText(table.concat(parts, "    "))
     local hdr = EUI_Bags.Header
     if hdr and hdr.itemCount then
-        hdr.itemCount:SetText(list and EllesmereUI.Lf("%d / %d Items", used, total) or "")
+        local text = ""
+        if list and filter then
+            text = EllesmereUI.Lf("%d Items", shown)
+        elseif list then
+            text = EllesmereUI.Lf("%d / %d Items", used, total)
+        end
+        hdr.itemCount:SetText(text)
     end
 end
 
@@ -459,7 +544,15 @@ local repaint = false
 local function Soon()
     if repaint then return end
     repaint = true
-    C_Timer.After(0.2, function() repaint = false; Paint() end)
+    C_Timer.After(0.2, function()
+        repaint = false
+        -- another character's sidebar counts come from the same items
+        if ns.OfflineAlt() and EUI_Bags:IsVisible() and EUI_Bags.RefreshInventory then
+            EUI_Bags:RefreshInventory()
+        else
+            Paint()
+        end
+    end)
 end
 local ev = CreateFrame("Frame")
 ev:SetScript("OnEvent", function() if waiting then Soon() end end)
@@ -469,9 +562,16 @@ Offline.OnChange(function() if panel and panel:IsShown() then Soon() end end)
 --  Hooked into the bags refresh
 -------------------------------------------------------------------------------
 -- after every bags refresh (FinishRefresh): over the item area while Bank is
--- selected, hidden otherwise. sidebarW: the sidebar's current width.
-function ns.OfflinePanel(selected, sidebarW)
-    if not (selected and Offline.Enabled()) then
+-- selected or another character is picked, hidden otherwise. sidebarW: the
+-- sidebar's current width.
+function ns.OfflinePanel(sidebarW)
+    SyncTitle()
+    if ns.GetSelection() == BANK_VIEW and Offline.Enabled() then
+        mode = "bank"
+    elseif ns.OfflineAlt() then
+        mode = "bags"
+    else
+        mode = nil
         if panel then panel:Hide() end
         ev:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
         return
@@ -485,15 +585,17 @@ function ns.OfflinePanel(selected, sidebarW)
         panel:SetPoint("BOTTOMRIGHT", EUI_Bags, "BOTTOMRIGHT", -1, 30)
     end
     panel:SetFrameLevel(EUI_Bags:GetFrameLevel() + 40)
-    viewKey = viewKey or Offline.CurrentKey()
     panel:Show()
     ev:RegisterEvent("GET_ITEM_INFO_RECEIVED")
     Paint()
 end
 
--- the option toggled: off leaves the Bank view for All Items
+-- the option toggled: off leaves the Bank view for All Items and goes back to this character
 function Offline.SyncButton()
     if not (EUI_Bags and EUI_Bags.RefreshInventory) then return end
-    if not Offline.Enabled() and ns.GetSelection() == BANK_VIEW then I.SetSelectedCategoryIndex(0) end
+    if not Offline.Enabled() then
+        viewKey = nil
+        if ns.GetSelection() == BANK_VIEW then I.SetSelectedCategoryIndex(0) end
+    end
     if EUI_Bags:IsVisible() then EUI_Bags:RefreshInventory() end
 end
