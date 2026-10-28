@@ -31,7 +31,7 @@ local _emptyP = {}
 local function BP() return (EUI._bagsDB and EUI._bagsDB.profile) or _emptyP end
 
 local SLOT_SIZE, SPACING = 34, 4
-local BAR_H, PAD = 30, 10
+local BAR_H, PAD = 24, 10  -- the bar matches the sidebar header (ns.CreateSidebarHeader)
 local ITEM_CLASS_WEAPON, ITEM_CLASS_ARMOR = Enum.ItemClass.Weapon, Enum.ItemClass.Armor
 local BANK_VIEW = -3
 ns.OFFLINE_BANK_VIEW = BANK_VIEW
@@ -865,7 +865,7 @@ if EUI_Bank then
         -- between the window's header and footer, right of the sidebar
         local _, _, _, left, top = sf:GetPoint(1)
         local _, _, _, _, bottom = sf:GetPoint(2)
-        Place(bankView, AltKey(bankView) and "bank" or nil, left or 0, -(top or -30) + 1, bottom or 30)
+        Place(bankView, AltKey(bankView) and "bank" or nil, left or 0, -(top or -30), bottom or 30)
     end
 
     if EUI_Bank.RefreshBank then hooksecurefunc(EUI_Bank, "RefreshBank", SyncBank) end
