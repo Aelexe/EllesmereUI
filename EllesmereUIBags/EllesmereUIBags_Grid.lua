@@ -18,6 +18,7 @@ local GetItemInfo = C_Item.GetItemInfo
 local GetItemQualityColor = C_Item.GetItemQualityColor
 
 local SLOT_SIZE, SPACING = ns.SLOT_SIZE, ns.SPACING
+ns.OnSlotMetrics(function(m) SLOT_SIZE, SPACING = m[1], m[2] end)
 local itemSlots = ns.itemSlots
 local _itemDragFrame = ns.itemDragFrame
 local _catHeaders = ns.catHeaders
@@ -76,7 +77,7 @@ local function GetOrCreateSlot(idx)
     if InCombatLockdown() then EUI_Bags._poolShort = true; return nil end
 
     local slotParent = CreateFrame("Frame", nil, EUI_Bags)
-    slotParent:SetSize(SLOT_SIZE, SLOT_SIZE)
+    ns.SizeSlot(slotParent)
     local btn = CreateFrame("ItemButton", nil, slotParent, "ContainerFrameItemButtonTemplate")
     ns.PinItemButton(btn, EUI_Bags)
     btn:SetAllPoints(slotParent)
@@ -522,7 +523,7 @@ function ns.RenderGridView(tempItems, displayItems, emptySlots, child, columns, 
     local function GetOrCreateEmptyPad(idx)
         if _emptyPads[idx] then return _emptyPads[idx] end
         local f = CreateFrame("Frame", nil, EUI_Bags)
-        f:SetSize(SLOT_SIZE, SLOT_SIZE)
+        ns.SizeSlot(f)
         f:EnableMouse(false)
         f._bg = f:CreateTexture(nil, "BACKGROUND", nil, 1)
         f._bg:SetAllPoints()

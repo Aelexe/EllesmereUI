@@ -21,6 +21,7 @@ local AbbrevDungeon, BP, GetColumns = I.AbbrevDungeon, I.BP, I.GetColumns
 local GetItemLevelAtLocation, IsGearItem = I.GetItemLevelAtLocation, I.IsGearItem
 local IsItemPinned, SetBagFont, SLOT_SIZE = I.IsItemPinned, I.SetBagFont, I.SLOT_SIZE
 local SPACING, _pendingResortCats = I.SPACING, I._pendingResortCats
+ns.OnSlotMetrics(function(m) SLOT_SIZE, SPACING = m[1], m[2] end)
 local _pendingResortGroups, _slotCategories = I._pendingResortGroups, I._slotCategories
 local AcquireSlotTable, bagSlots = I.AcquireSlotTable, I.bagSlots
 local DetectAndApplySwaps, FOOTER_H, HEADER_H = I.DetectAndApplySwaps, I.FOOTER_H, I.HEADER_H
@@ -437,6 +438,10 @@ local _bagListGripCfg = setmetatable({
         if EUI_Bags._updateThumb then EUI_Bags._updateThumb() end
     end,
 }, { __index = _bagGripCfg })
+ns.OnSlotMetrics(function(m)
+    _bagGripCfg.step = m[1] + m[2]
+    rawset(_bagListGripCfg, "relayoutStep", m[1] + m[2])
+end)
 
 local function FinishRefresh(curY, gridContentW, sidebarW, totalCount, numEmpty, spItems, spEmpty)
     -- In combat the sort button's lock depends on the view just painted.
@@ -522,6 +527,7 @@ end
 
 function EUI_Bags:RefreshInventory()
     if not EUI_Bags:IsVisible() then return end
+    ns.ApplySlotMetrics()
 
     -- A select mode's hover box sits on a button this refresh may refill: put
     -- that button's border back now and re-test the hover after

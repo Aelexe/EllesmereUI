@@ -16,7 +16,7 @@ local EUI = EllesmereUI
 
 local BP, GetAccentRGB, GetFont, IsGearItem = I.BP, I.GetAccentRGB, I.GetFont, I.IsGearItem
 local IsItemPinned, NormalizePinKey = I.IsItemPinned, I.NormalizePinKey
-local SetBagFont, SLOT_SIZE, _openItemPanels = I.SetBagFont, I.SLOT_SIZE, I._openItemPanels
+local SetBagFont, _openItemPanels = I.SetBagFont, I._openItemPanels
 local itemSlots, SetInsetBorderColor = I.itemSlots, I.SetInsetBorderColor
 
 -------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ end
 local function GetOrCreatePinOverlay()
     if EUI_Bags._pinOverlayBtn then return OverSlots(EUI_Bags._pinOverlayBtn) end
     local ov = ns.CreatePlusButton(EUI_Bags, ns.PIN_PLUS_TIP)
-    ov:SetSize(SLOT_SIZE, SLOT_SIZE)
+    ns.SizeSlot(ov)
     ov:SetScript("OnReceiveDrag", ns.PinCursorItem)
     ov:SetScript("OnClick", function(self)
         -- Click-to-place also pins
@@ -132,7 +132,7 @@ local function GetOrCreateAssignOverlay()
     _assignOverlayIdx = _assignOverlayIdx + 1
     if _assignOverlays[_assignOverlayIdx] then return OverSlots(_assignOverlays[_assignOverlayIdx]) end
     local ov = ns.CreatePlusButton(EUI_Bags, ns.ASSIGN_PLUS_TIP)
-    ov:SetSize(SLOT_SIZE, SLOT_SIZE)
+    ns.SizeSlot(ov)
     local function DoAssign(self)
         if ns.AssignCursorItem(self._assignCatKey) then return end
         -- No cursor item: enter assign select mode (like pin select)

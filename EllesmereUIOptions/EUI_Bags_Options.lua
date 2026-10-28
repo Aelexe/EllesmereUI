@@ -183,6 +183,22 @@ initFrame:SetScript("OnEvent", function(self)
                 if bags.RefreshInventory then bags:RefreshInventory() end
             end
 
+            -- slot size / spacing: the sliders fire every step while dragging,
+            -- so the windows lay out once per frame at most
+            local relayoutQueued = false
+            local function RelayoutSoon()
+                if relayoutQueued then return end
+                relayoutQueued = true
+                C_Timer.After(0, function()
+                    relayoutQueued = false
+                    local bags = _G.EUI_Bags
+                    if bags then bags._compactCols, bags._compactW = nil, nil end
+                    ResetAndRefreshBagLayout()
+                    local bank = _G.EUI_BankFrame
+                    if bank and bank:IsVisible() and bank.RefreshBank then bank:RefreshBank() end
+                end)
+            end
+
             local BagsNS = EllesmereUI._ModuleNS["EllesmereUIBags"]
             -- Bag Style value: "grid" | "list" | "compact" (any other saved value reads as Grid)
             local function BagDisplayValue()
@@ -257,6 +273,20 @@ initFrame:SetScript("OnEvent", function(self)
                       if _G.EUI_Bags and _G.EUI_Bags.ApplyWindowLayering then
                           _G.EUI_Bags:ApplyWindowLayering()
                       end
+                  end },
+                { type="slider", text="Slot Size", min=24, max=56, step=1,
+                  tooltip="Size of each item slot in bags and bank.",
+                  getValue=function() return db.profile.bagSlotSize or 34 end,
+                  setValue=function(v)
+                      db.profile.bagSlotSize = v
+                      RelayoutSoon()
+                  end },
+                { type="slider", text="Slot Spacing", min=0, max=12, step=1,
+                  tooltip="Space between item slots in bags and bank.",
+                  getValue=function() return db.profile.bagSlotSpacing or 4 end,
+                  setValue=function(v)
+                      db.profile.bagSlotSpacing = v
+                      RelayoutSoon()
                   end },
             }
             -- The List display has no Auto-Size to Fit (its rows take the grip-set width)

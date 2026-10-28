@@ -30,6 +30,10 @@ local PITCH = SLOT_SIZE + SPACING
 -- icon spacing
 local BLOCK_GAP = 14
 local GAP_EXTRA = BLOCK_GAP - SPACING
+ns.OnSlotMetrics(function(m)
+    SLOT_SIZE, SPACING = m[1], m[2]
+    PITCH, GAP_EXTRA = SLOT_SIZE + SPACING, BLOCK_GAP - SPACING
+end)
 -- The fewest cells a block takes when another block follows it in its band;
 -- a band's last block takes what it needs
 local MID_MIN_CELLS = 3
