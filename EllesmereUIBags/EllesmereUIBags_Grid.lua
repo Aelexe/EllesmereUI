@@ -625,6 +625,7 @@ function ns.RenderGridView(tempItems, displayItems, emptySlots, child, columns, 
                     pad:ClearAllPoints()
                     pad:SetPoint("TOPLEFT", child, "TOPLEFT",
                         startX + usedWidth + SPACING + (index - 1) * stride, itemTop)
+                    ns.PaintSlotBackground(pad._bg, 0.35)
                     pad:Show()
                 end
             end

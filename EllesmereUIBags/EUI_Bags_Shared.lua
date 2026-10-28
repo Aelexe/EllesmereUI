@@ -100,8 +100,12 @@ function ns.ApplyWindowBackground(bg, overlay)
 end
 
 -- slot background: tint over an empty slot's backdrop, alpha is the slot's
--- own base opacity
+-- own base opacity. each painted one is kept (weakly) so a color change can
+-- retint them without a relayout
+local slotBgs = setmetatable({}, { __mode = "k" })
 function ns.PaintSlotBackground(tex, alpha)
+    tex._slotBgAlpha = alpha
+    slotBgs[tex] = true
     local c = BP().bagSlotBgColor
     if c then
         tex:SetVertexColor(c.r, c.g, c.b)
@@ -109,6 +113,13 @@ function ns.PaintSlotBackground(tex, alpha)
     else
         tex:SetVertexColor(1, 1, 1)
         tex:SetAlpha(alpha)
+    end
+end
+
+-- the slot background picker: just the shown ones (hidden ones get painted when they show)
+function ns.RetintSlotBackgrounds()
+    for tex in pairs(slotBgs) do
+        if tex:IsVisible() then ns.PaintSlotBackground(tex, tex._slotBgAlpha) end
     end
 end
 

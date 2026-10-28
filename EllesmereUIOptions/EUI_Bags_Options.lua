@@ -310,7 +310,8 @@ initFrame:SetScript("OnEvent", function(self)
                 end,
                 setValue=function(r, g, b, a)
                     db.profile.bagSlotBgColor = { r = r, g = g, b = b, a = a }
-                    RefreshWindows()
+                    -- the picker fires every frame while dragging: retint, don't re-lay out
+                    if BagsNS and BagsNS.RetintSlotBackgrounds then BagsNS.RetintSlotBackgrounds() else RefreshWindows() end
                 end }
             for i = 1, #layoutSlots, 2 do
                 _, h = W:DualRow(parent, y, layoutSlots[i], layoutSlots[i + 1] or EllesmereUI.BlankRowCfg()); y = y - h
