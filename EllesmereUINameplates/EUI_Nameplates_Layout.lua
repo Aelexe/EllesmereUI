@@ -743,11 +743,10 @@ do
             fs:SetText(name)
         end
     end
-    -- WoW Forever: the name slot's Name Format (text-slot cog), the first or last word
-    -- of the name; unset shows it whole. Defined only on Forever, so retail's name
-    -- write pays one nil check. Keys prebuilt (no per-update string building); the
-    -- split, its secret pass-through and its bounded cache live in ForeverShortName.
-    if EllesmereUI.IS_FOREVER then
+    -- Name Format (text-slot cog): one word, initials, or a character cap. Unset
+    -- shows the name whole. One nil check while ForeverShortName is absent. Keys
+    -- are prebuilt; the split and its cache live in ForeverShortName.
+    if EllesmereUI.ForeverShortName then
         local NAME_FORMAT_KEYS = {
             textSlotTop  = "textSlotTopNameFormat",  textSlotRight  = "textSlotRightNameFormat",
             textSlotLeft = "textSlotLeftNameFormat", textSlotCenter = "textSlotCenterNameFormat",
@@ -805,6 +804,25 @@ do
         if ns.NP_FormatName then name = ns.NP_FormatName(name, slotKey) end
         return name
     end
+    -- Tag modifiers shape the plain name. They do not also apply the slot's Name Format.
+    local function Shaped(mode)
+        return function(u)
+            local name = EllesmereUI.WithSurname(UnitName(u))
+            if type(name) == "nil" then return "" end
+            local short = EllesmereUI.ForeverShortName
+            if not short then return name end
+            return short(name, mode)
+        end
+    end
+    local function TargetShaped(mode)
+        local piece = Shaped(mode)
+        return function(u)
+            local tu = ns._npToTUnits[u]
+            if not tu then tu = u .. "target"; ns._npToTUnits[u] = tu end
+            if not UnitExists(tu) then return "" end
+            return piece(tu)
+        end
+    end
     local P = {
         ["hp"] = function(u)
             if UnitIsDeadOrGhost(u) then return EllesmereUI.L("DEAD") end
@@ -823,12 +841,17 @@ do
         ["absorb"] = function(u) return C_StringUtil.TruncateWhenZero(UnitGetTotalAbsorbs(u) or 0) end,
         ["absorb:abr"] = function(u) return ns.AbbreviateNumbers(UnitGetTotalAbsorbs(u) or 0) end,
         ["name"] = Name,
+        ["name:first"] = Shaped("first"), ["name:last"] = Shaped("last"), ["name:abbr"] = Shaped("abbr"),
+        ["name:10"] = Shaped("10"), ["name:15"] = Shaped("15"), ["name:4"] = Shaped("4"),
         ["target"] = function(u, slotKey)
             local tu = ns._npToTUnits[u]
             if not tu then tu = u .. "target"; ns._npToTUnits[u] = tu end
             if not UnitExists(tu) then return "" end
             return Name(tu, slotKey)
         end,
+        ["target:first"] = TargetShaped("first"), ["target:last"] = TargetShaped("last"),
+        ["target:abbr"] = TargetShaped("abbr"), ["target:10"] = TargetShaped("10"),
+        ["target:15"] = TargetShaped("15"), ["target:4"] = TargetShaped("4"),
         ["level"] = function(u) return ns.GetUnitLevelText(u) end,
     }
     local CAT = TT.Bind(TT.UNIT, P)

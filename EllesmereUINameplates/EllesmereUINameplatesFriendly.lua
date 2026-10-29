@@ -502,6 +502,13 @@ local function ApplyOverlayStyle(overlay, unit)
     overlay.title:SetTextColor(GetNPCTitleColor(unit))
 end
 
+local function FormatNPCName(name)
+    local fp = FP()
+    local mode = fp and fp.friendlyNPCNameFormat
+    if not mode or mode == "full" or not EllesmereUI.ForeverShortName then return name end
+    return EllesmereUI.ForeverShortName(name, mode)
+end
+
 local function ShowNPCOverlay(nameplate, unit)
     if npcOverlays[nameplate] then return end
     local overlay = AcquireOverlay()
@@ -511,7 +518,7 @@ local function ShowNPCOverlay(nameplate, unit)
     overlay:SetFrameLevel(nameplate:GetFrameLevel() + 5)
     overlay:Show()
     -- Set name text
-    local unitName = UnitName(unit) or ""
+    local unitName = FormatNPCName(UnitName(unit) or "")
     overlay.name:SetText(unitName)
     overlay.name:SetWidth(0)
     overlay.name:SetWordWrap(false)
@@ -535,7 +542,7 @@ local function ShowNPCOverlay(nameplate, unit)
     overlay:RegisterUnitEvent("UNIT_NAME_UPDATE", unit)
     overlay:SetScript("OnEvent", function(self, event, ...)
         if event == "UNIT_NAME_UPDATE" then
-            local updatedName = UnitName(self.unit) or ""
+            local updatedName = FormatNPCName(UnitName(self.unit) or "")
             self.name:SetText(updatedName)
         end
     end)
@@ -685,8 +692,14 @@ end
 local FriendlyNameFormat, FormatFriendlyName, StampFriendlyNames
 if EllesmereUI.IS_FOREVER then
     local short, WithSurname = EllesmereUI.ForeverShortName, EllesmereUI.WithSurname
-    local titledShort = { first = {}, last = {} }   -- [mode][full name][string] = result
-    local titledCount = { first = 0, last = 0 }
+    local titledShort = {
+        first = {}, last = {}, abbr = {},
+        ["10"] = {}, ["15"] = {}, ["4"] = {},
+    }
+    local titledCount = {
+        first = 0, last = 0, abbr = 0,
+        ["10"] = 0, ["15"] = 0, ["4"] = 0,
+    }
     FriendlyNameFormat = function()
         local fp = FP()
         return fp and fp.friendlyNameFormat
@@ -816,6 +829,10 @@ local function UpdateNameOnlyText(nameFS)
     -- FriendlyNameFormat is nil elsewhere).
     if isPlayer and FriendlyNameFormat and FriendlyNameFormat() then
         want = FormatFriendlyName(unit, want, ModeHasTitle(mode))
+    elseif isPlayer and EllesmereUI.ForeverShortName then
+        local fp = FP()
+        local saved = fp and fp.friendlyNameFormat
+        if saved and saved ~= "full" then want = EllesmereUI.ForeverShortName(want, saved) end
     end
 
     local guild
@@ -1450,6 +1467,10 @@ function FriendlyFrame:UpdateName()
     if not unitName then unitName = EllesmereUI.WithSurname(UnitName(unit)) end
     if fmt and isPlayer and unitName then
         unitName = FormatFriendlyName(unit, unitName, hasTitle)
+    elseif unitName and EllesmereUI.ForeverShortName and UnitIsPlayer(unit) then
+        local fp = FP()
+        local saved = fp and fp.friendlyNameFormat
+        if saved and saved ~= "full" then unitName = EllesmereUI.ForeverShortName(unitName, saved) end
     end
     self.name:SetText(unitName or "")
     self:UpdateSubText()

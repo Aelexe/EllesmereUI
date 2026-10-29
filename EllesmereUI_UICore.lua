@@ -1182,17 +1182,34 @@ do
         return full
     end
 
-    -- Name Format (WoW Forever only; nil on retail, where no caller runs):
+    -- Name Format, on every client:
     --     EllesmereUI.ForeverShortName(name, mode)
-    -- mode "first" keeps the name's first word, "last" its last; any other
-    -- mode (nil = First and Last) returns it unchanged, as does a one-word,
-    -- secret or non-string name. Words split at spaces and at the surname
-    -- separator. Short forms are cached per mode and name, so repaints build
-    -- no strings; a mode's cache is wiped once it holds 256 names.
-    if IS_FOREVER then
-        local short = { first = {}, last = {} }   -- [mode][name] = short form
-        local count = { first = 0, last = 0 }
+    -- "first" / "last" keep one word. "abbr" shortens every word but the last
+    -- to an initial ("Illidan Stormrage" -> "I. Stormrage"). "10" / "15" / "4"
+    -- keep that many characters. Any other mode, nil included, is the full
+    -- name. A secret or non-string name is returned as it is. Words split at
+    -- spaces and at the surname separator. Each mode caches 256 names.
+    do
+        local short = {
+            first = {}, last = {}, abbr = {},
+            ["10"] = {}, ["15"] = {}, ["4"] = {},
+        }
+        local count = {
+            first = 0, last = 0, abbr = 0,
+            ["10"] = 0, ["15"] = 0, ["4"] = 0,
+        }
+        local LIMIT = { ["10"] = 10, ["15"] = 15, ["4"] = 4 }
         local sepPat = (SEP ~= " " and SEP ~= "") and SEP:gsub("%W", "%%%0") or nil
+
+        local function Utf8Prefix(value, limit)
+            local out, n = {}, 0
+            for ch in value:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+                n = n + 1
+                if n > limit then break end
+                out[n] = ch
+            end
+            return table.concat(out)
+        end
 
         function EllesmereUI.ForeverShortName(name, mode)
             local cache = short[mode]
@@ -1202,8 +1219,22 @@ do
             local words = sepPat and name:gsub(sepPat, " ") or name
             if mode == "first" then
                 s = words:match("^%s*(%S+)")
-            else
+            elseif mode == "last" then
                 s = words:match("(%S+)%s*$")
+            elseif mode == "abbr" then
+                local parts = {}
+                for word in words:gmatch("%S+") do parts[#parts + 1] = word end
+                if #parts >= 2 then
+                    for i = 1, #parts - 1 do
+                        parts[i] = Utf8Prefix(parts[i], 1) .. "."
+                    end
+                    s = table.concat(parts, " ")
+                else
+                    s = name
+                end
+            else
+                local lim = LIMIT[mode]
+                s = lim and Utf8Prefix(words, lim) or name
             end
             s = s or name
             if count[mode] >= 256 then wipe(cache); count[mode] = 0 end
@@ -1219,9 +1250,13 @@ do
         -- settings that differ: the order leaves it out, so it is never offered.
         --     EllesmereUI.NameFormatCogRow(get, set)
         -- A settings-cog dropdown row for one Name Format: get() returns the
-        -- saved value ("first", "last" or nil) and set(v) receives the same.
-        local VALUES = { first = "First Name", last = "Last Name", full = "First and Last", mixed = "Mixed" }
-        local ORDER = { "first", "last", "full" }
+        -- saved value and set(v) receives the same ("full" arrives as nil).
+        local VALUES = {
+            first = "First Name", last = "Last Name", full = "First and Last",
+            abbr = "Abbreviated", ["10"] = "10 Characters", ["15"] = "15 Characters",
+            ["4"] = "4 Characters", mixed = "Mixed",
+        }
+        local ORDER = { "first", "last", "full", "abbr", "10", "15", "4" }
         EllesmereUI.NAME_FORMAT_VALUES, EllesmereUI.NAME_FORMAT_ORDER = VALUES, ORDER
         function EllesmereUI.NameFormatCogRow(get, set)
             return { type = "dropdown", label = "Name Format", values = VALUES, order = ORDER,

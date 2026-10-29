@@ -1456,7 +1456,7 @@ local function BuildVisualBars(parent, y, W, onSection, EYE)
     y = ns.RFO_BuildTextDisplay(W, parent, y, { page = EllesmereUI._buildingPage, party = optState._partyCtx })
     -- WoW Forever's Name Format also shapes the Top Name Bar, so it has a row of
     -- its own, not a place on the Name tile.
-    if EllesmereUI.IS_FOREVER then
+    if EllesmereUI.NAME_FORMAT_VALUES then
         _, h = W:DualRow(parent, y,
             { type="dropdown", text="Name Format",
               values=EllesmereUI.NAME_FORMAT_VALUES, order=EllesmereUI.NAME_FORMAT_ORDER,

@@ -481,7 +481,7 @@ end
 -- WoW Forever Name Format (Text Display, nameFormat): the character name's
 -- first or last word; unset or "full" shows it whole. Nicknames are never
 -- shortened. Defined only on Forever, so elsewhere a name pays one nil test.
-if ns.EllesmereUI.IS_FOREVER then
+if ns.EllesmereUI.ForeverShortName then
     function ns.RF_FormatName(display, s)
         local mode = s and s.nameFormat
         if not mode or mode == "full" then return display end
@@ -895,6 +895,14 @@ do
         return ""
     end
 
+    local function Shaped(base, mode)
+        return function(unit, s, pv)
+            local name = base(unit, s, pv)
+            local short = EllesmereUI.ForeverShortName
+            if not short or name == nil or name == "" then return name end
+            return short(name, mode)
+        end
+    end
     local CATALOG = TextTags.Bind(TextTags.UNIT, {
         ["hp"] = Amount("hp"), ["hp:abr"] = Amount("hp:abr"), ["hp:max"] = Amount("hp:max"),
         ["hp:max:abr"] = Amount("hp:max:abr"), ["hp:pct"] = HealthPct,
@@ -904,7 +912,13 @@ do
         ["absorb:abr"] = Absorb("absorb:abr", UnitGetTotalAbsorbs),
         ["healabsorb"] = Absorb("healabsorb", UnitGetTotalHealAbsorbs),
         ["healabsorb:abr"] = Absorb("healabsorb:abr", UnitGetTotalHealAbsorbs),
-        ["name"] = Name, ["target"] = Target, ["group"] = Group,
+        ["name"] = Name, ["name:first"] = Shaped(Name, "first"), ["name:last"] = Shaped(Name, "last"),
+        ["name:abbr"] = Shaped(Name, "abbr"), ["name:10"] = Shaped(Name, "10"),
+        ["name:15"] = Shaped(Name, "15"), ["name:4"] = Shaped(Name, "4"),
+        ["target"] = Target, ["target:first"] = Shaped(Target, "first"), ["target:last"] = Shaped(Target, "last"),
+        ["target:abbr"] = Shaped(Target, "abbr"), ["target:10"] = Shaped(Target, "10"),
+        ["target:15"] = Shaped(Target, "15"), ["target:4"] = Shaped(Target, "4"),
+        ["group"] = Group,
     })
     ns.RF_TextTags = CATALOG
 
