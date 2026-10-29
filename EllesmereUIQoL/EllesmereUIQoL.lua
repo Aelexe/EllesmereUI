@@ -2162,6 +2162,58 @@ do
 end
 
 -------------------------------------------------------------------------------
+--  Auto-Accept Resurrection
+--  Accepts res requests automatically. A res from a caster in combat (a
+--  battle res) is left to the player unless the combat option is on.
+-------------------------------------------------------------------------------
+do
+    local issecret = issecretvalue or function() return false end
+    local POPUPS = { "RESURRECT", "RESURRECT_NO_SICKNESS", "RESURRECT_NO_TIMER" }
+    local frame
+
+    -- A secret or unreadable answer counts as in combat.
+    local function CasterInCombat(caster)
+        if not caster then return false end
+        local ok, v = pcall(UnitAffectingCombat, caster)
+        if not ok or issecret(v) then return true end
+        return v and true or false
+    end
+
+    local function OnEvent(_, event, caster)
+        if event == "RESURRECT_REQUEST" then
+            if not EllesmereUIDB.autoAcceptResCombat and CasterInCombat(caster) then return end
+            AcceptResurrect()
+        elseif not UnitIsDeadOrGhost("player") and StaticPopup_Hide then
+            for i = 1, #POPUPS do StaticPopup_Hide(POPUPS[i]) end
+        end
+    end
+
+    local function ApplyAutoAcceptRes()
+        local on = EllesmereUIDB and EllesmereUIDB.autoAcceptRes
+        if on and not frame then
+            frame = CreateFrame("Frame")
+            frame:SetScript("OnEvent", OnEvent)
+        end
+        if not frame then return end
+        if on then
+            frame:RegisterEvent("RESURRECT_REQUEST")
+            frame:RegisterEvent("PLAYER_ALIVE")
+            frame:RegisterEvent("PLAYER_UNGHOST")
+        else
+            frame:UnregisterAllEvents()
+        end
+    end
+    EllesmereUI._applyAutoAcceptRes = ApplyAutoAcceptRes
+
+    local f = CreateFrame("Frame")
+    f:RegisterEvent("PLAYER_LOGIN")
+    f:SetScript("OnEvent", function(self)
+        self:UnregisterAllEvents()
+        if EllesmereUIDB and EllesmereUIDB.autoAcceptRes then ApplyAutoAcceptRes() end
+    end)
+end
+
+-------------------------------------------------------------------------------
 --  Secondary Stats Display
 --  On-screen overlay showing crit/haste/mastery/vers (+ optional tertiaries).
 -------------------------------------------------------------------------------
