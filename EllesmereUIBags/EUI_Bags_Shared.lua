@@ -16,7 +16,7 @@ I.broken = true
 local GetItemInfoInstant = C_Item.GetItemInfoInstant
 local EUI = EllesmereUI
 
-local BP, GetFont, SetBagFont, SLOT_SIZE = I.BP, I.GetFont, I.SetBagFont, I.SLOT_SIZE
+local BP, GetFont, SetBagFont = I.BP, I.GetFont, I.SetBagFont
 
 -- Shared state: one copy per file. A write goes through the Set<Name>
 -- function of ns._bagsInternals, which hands the value to every copy.
@@ -149,7 +149,7 @@ function ns.SkinItemButton(btn, opts)
     if btn.flash then btn.flash:Hide(); btn.flash:SetAlpha(0) end
     if btn.newitemglowAnim then btn.newitemglowAnim:Stop() end
 
-    btn:SetSize(SLOT_SIZE, SLOT_SIZE)
+    ns.SizeSlot(btn)
     if btn.icon then
         local z = BP().bagItemIconZoom or 0.08
         btn.icon:SetTexCoord(z, 1 - z, z, 1 - z)

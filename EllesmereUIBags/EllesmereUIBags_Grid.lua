@@ -18,6 +18,7 @@ local GetItemInfo = C_Item.GetItemInfo
 local GetItemQualityColor = C_Item.GetItemQualityColor
 
 local SLOT_SIZE, SPACING = ns.SLOT_SIZE, ns.SPACING
+ns.OnSlotMetrics(function(m) SLOT_SIZE, SPACING = m[1], m[2] end)
 local itemSlots = ns.itemSlots
 local _itemDragFrame = ns.itemDragFrame
 local _catHeaders = ns.catHeaders
@@ -76,7 +77,7 @@ local function GetOrCreateSlot(idx)
     if InCombatLockdown() then EUI_Bags._poolShort = true; return nil end
 
     local slotParent = CreateFrame("Frame", nil, EUI_Bags)
-    slotParent:SetSize(SLOT_SIZE, SLOT_SIZE)
+    ns.SizeSlot(slotParent)
     local btn = CreateFrame("ItemButton", nil, slotParent, "ContainerFrameItemButtonTemplate")
     ns.PinItemButton(btn, EUI_Bags)
     btn:SetAllPoints(slotParent)
@@ -307,12 +308,12 @@ local function RenderButton(btn, data, _, col, row, startX, currentY, _, interac
                 if not btn.SetNameText then
                     local overlay = btn._textOverlay or btn
                     btn.SetNameText = overlay:CreateFontString(nil, "OVERLAY", nil, 7)
-                    btn.SetNameText:SetPoint("BOTTOM", btn, "BOTTOM", 0, 2)
+                    btn.SetNameText:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 2, 2)
+                    btn.SetNameText:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2, 2)
                     btn.SetNameText:SetTextColor(1, 1, 1, 1)
                     btn.SetNameText:SetJustifyH("CENTER")
                     btn.SetNameText:SetWordWrap(false)
                     btn.SetNameText:SetMaxLines(1)
-                    btn.SetNameText:SetWidth(SLOT_SIZE - 4)
                     btn.SetNameText:SetFont(GetFont(), BP().bagSetNameFontSize or 9, (EllesmereUI.SlugFlag("OUTLINE, SLUG")) or "OUTLINE, SLUG")
                 end
                 btn.SetNameText:SetText(data._setName)
@@ -522,7 +523,7 @@ function ns.RenderGridView(tempItems, displayItems, emptySlots, child, columns, 
     local function GetOrCreateEmptyPad(idx)
         if _emptyPads[idx] then return _emptyPads[idx] end
         local f = CreateFrame("Frame", nil, EUI_Bags)
-        f:SetSize(SLOT_SIZE, SLOT_SIZE)
+        ns.SizeSlot(f)
         f:EnableMouse(false)
         f._bg = f:CreateTexture(nil, "BACKGROUND", nil, 1)
         f._bg:SetAllPoints()

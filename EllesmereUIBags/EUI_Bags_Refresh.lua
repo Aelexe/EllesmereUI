@@ -21,6 +21,7 @@ local AbbrevDungeon, BP, GetColumns = I.AbbrevDungeon, I.BP, I.GetColumns
 local GetItemLevelAtLocation, IsGearItem = I.GetItemLevelAtLocation, I.IsGearItem
 local IsItemPinned, SetBagFont, SLOT_SIZE = I.IsItemPinned, I.SetBagFont, I.SLOT_SIZE
 local SPACING, _pendingResortCats = I.SPACING, I._pendingResortCats
+ns.OnSlotMetrics(function(m) SLOT_SIZE, SPACING = m[1], m[2] end)
 local _pendingResortGroups, _slotCategories = I._pendingResortGroups, I._slotCategories
 local AcquireSlotTable, bagSlots = I.AcquireSlotTable, I.bagSlots
 local DetectAndApplySwaps, FOOTER_H, HEADER_H = I.DetectAndApplySwaps, I.FOOTER_H, I.HEADER_H
@@ -437,6 +438,17 @@ local _bagListGripCfg = setmetatable({
         if EUI_Bags._updateThumb then EUI_Bags._updateThumb() end
     end,
 }, { __index = _bagGripCfg })
+-- a new slot size: grow-only widths start over, and the detached reagent
+-- window and bag bar lay out again (the main refresh does the rest)
+ns.OnSlotMetrics(function(m)
+    _bagGripCfg.step = m[1] + m[2]
+    _bagGripCfg.minCols = math.max(1, math.ceil(8 * 38 / (m[1] + m[2])))
+    rawset(_bagListGripCfg, "relayoutStep", m[1] + m[2])
+    EUI_Bags._compactCols, EUI_Bags._compactW = nil, nil
+    EUI_Bags._asCols, EUI_Bags._asMaxGridW, EUI_Bags._asMaxH = nil, nil, nil
+    if EUI_BagsReagent:IsShown() and EUI_BagsReagent.RefreshInventory then EUI_BagsReagent:RefreshInventory() end
+    if EUI_BagsWindow:IsShown() and EUI_BagsWindow.RefreshBags then EUI_BagsWindow:RefreshBags() end
+end)
 
 local function FinishRefresh(curY, gridContentW, sidebarW, totalCount, numEmpty, spItems, spEmpty)
     -- In combat the sort button's lock depends on the view just painted.
@@ -525,6 +537,7 @@ end
 
 function EUI_Bags:RefreshInventory()
     if not EUI_Bags:IsVisible() then return end
+    ns.ApplySlotMetrics()
 
     -- A select mode's hover box sits on a button this refresh may refill: put
     -- that button's border back now and re-test the hover after
@@ -828,8 +841,10 @@ function EUI_Bags:RefreshInventory()
     -- (running max in _asCols, reset on close); HEIGHT follows rendered content up to the screen cap. Decided BEFORE GetColumns() so the grid renders at this count.
     if EUI_Bags.AutoSizeOn() then
         local baseCols = BP().bagColumns or 12
-        local BASE_ROWS = 15  -- rows visible at the base (FIXED_H) height
-        local HDR = 0.74      -- section-header height in slot-row units (~28/38)
+        -- tuned at the default 38 px pitch, scaled to the current one
+        local pitch = SLOT_SIZE + SPACING
+        local BASE_ROWS = 15 * 38 / pitch  -- rows visible at the base (FIXED_H) height
+        local HDR = 0.74 * 38 / pitch      -- section-header height in slot-row units (~28/38)
         -- Slot count (n) + section-header count (S) for the active tab. Headers add HEIGHT
         -- but not WIDTH, so they MUST fold into the estimate or a header-heavy tab (All Items with many categories) grows taller than wide.
         local n, S
