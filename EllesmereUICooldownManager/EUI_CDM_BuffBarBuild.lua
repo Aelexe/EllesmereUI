@@ -145,7 +145,7 @@ function ns.BuildTrackedBuffBars()
                 local displayName = (cfg.customName and cfg.customName ~= "") and cfg.customName or cfg.name
                 -- Preset bars take the live label the same way the icon does above:
                 -- the copy saved at pick time can name the other faction's lust.
-                if cfg.popularKey then
+                if cfg.popularKey and not (cfg.customName and cfg.customName ~= "") then
                     for _, pe in ipairs(TBB_POPULAR_BUFFS) do
                         if pe.key == cfg.popularKey then
                             displayName = pe.name or displayName

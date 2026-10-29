@@ -444,10 +444,10 @@ function ns.UpdateTrackedBuffBarTimers()
                     --     cooldownInfo override/spellID/linkedSpellIDs).
                     --  3. The configured spell's name (deterministic).
                     if content and bar._nameText and bar._nameText:IsShown() then
-                      if cfg.customName and cfg.customName ~= "" then
-                        bar._nameText:SetText(cfg.customName)
-                        bar._nameSet = true
-                      else
+                        if cfg.customName and cfg.customName ~= "" then
+                            bar._nameText:SetText(cfg.customName)
+                            bar._nameSet = true
+                        else
                         local nameStr
                         -- auraInstanceID may itself be SECRET on the active frame
                         -- (probe-confirmed): type() reads the tag without touching
@@ -525,7 +525,7 @@ function ns.UpdateTrackedBuffBarTimers()
                             bar._nameText:SetText(nameStr)
                             bar._nameSet = true
                         end
-                      end
+                        end
                     end
                     -- Timer: engine-bound decimal mirror first (the engine formats the secret
                     -- remaining time into a hidden FS we copy). Fallback: passthrough from
