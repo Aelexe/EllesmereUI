@@ -111,7 +111,7 @@ XF.FreeAnchor = function(c, set)
     if not r then return false end
     local grow, wrap, horizontal = XF.GrowInfo(set, db and db.profile)
     local corner, x, y = FB.CornerPin(horizontal and grow or wrap, horizontal and wrap or grow, r)
-    FB.Pin(c, corner, UIParent, "CENTER", x, y)
+    FB.FreePin(c, corner, x, y)
     return true
 end
 
@@ -168,7 +168,8 @@ XF.Pitch = function(set, s)
     if set and set.position ~= "free" and ns.RF_CompactOn(db.profile, false) then
         return ns.RF_OnePixel(false)
     end
-    return s.cellSpacing or 2
+    -- Same grid as FB.FreePin: the extra container's own scale.
+    return EllesmereUI.PP.SnapForES(s.cellSpacing or 2, XF.container:GetEffectiveScale())
 end
 
 -- Geometry only: container size, button stacking, per-button size (Extra
@@ -424,11 +425,11 @@ XF.EnsureBuilt = function(count)
                 if event ~= "UNIT_MAX_HEALTH_MODIFIERS_CHANGED" then ns._AbArm(b, unit, dd) end
                 ns._MarkAbsorbDirty(b, unit)
                 if event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then ns.UpdateHealAbsorbTextFor(b, unit) end
-                -- Custom texts showing an absorb amount (two field reads while none does); the
-                -- max-health-modifier edge repaints them through _UpdateButtonHealth below.
+                -- Custom texts showing the amount this event moved (two field reads while
+                -- none does); the max-health-modifier edge moves health only.
                 local tp = dd._txP
                 if tp and tp.reads and event ~= "UNIT_MAX_HEALTH_MODIFIERS_CHANGED" then
-                    ns.RF_TextRepaintCustom(dd, unit, "abs", "habs")
+                    ns.RF_TextRepaintCustom(dd, unit, event == "UNIT_ABSORB_AMOUNT_CHANGED" and "abs" or "habs")
                 end
                 if event == "UNIT_MAX_HEALTH_MODIFIERS_CHANGED" then
                     dd._rmhPct = nil -- reduced-max cache: this is its only value edge

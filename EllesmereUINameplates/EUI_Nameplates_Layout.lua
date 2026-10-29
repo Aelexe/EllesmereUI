@@ -817,12 +817,10 @@ do
         ["hp:max"] = function(u) return sf("%d", UnitHealthMax(u) or 0) end,
         ["hp:max:abr"] = function(u) return ns.AbbreviateNumbers(UnitHealthMax(u) or 0) end,
         ["hp:pct"] = function(u)
-            if UnitIsDeadOrGhost(u) or not UnitHealthPercent then return "0" end
+            if UnitIsDeadOrGhost(u) then return "0" end
             return sf("%d", UnitHealthPercent(u, true, CurveConstants.ScaleTo100) or 0)
         end,
-        ["absorb"] = function(u)
-            return sf("%s", C_StringUtil.TruncateWhenZero(UnitGetTotalAbsorbs(u) or 0) or "")
-        end,
+        ["absorb"] = function(u) return C_StringUtil.TruncateWhenZero(UnitGetTotalAbsorbs(u) or 0) end,
         ["absorb:abr"] = function(u) return ns.AbbreviateNumbers(UnitGetTotalAbsorbs(u) or 0) end,
         ["name"] = Name,
         ["target"] = function(u, slotKey)
@@ -867,6 +865,9 @@ do
         local n = c.n
         for i = 1, n do args[i] = c[i](unit, slotKey) end
         fs:SetFormattedText(c.fmt, unpack(args, 1, n))
+        -- An empty Top text (no target, no shield) keeps its line: the top aura row
+        -- and the range text anchor to it. GetText reads nil while empty.
+        if slotKey == "textSlotTop" and not fs:GetText() then fs:SetText(" ") end
     end
     -- Estimated width of a slot's custom text, 0 while empty. db: as NP_CustomParse.
     function ns.NP_CustomWidth(slotKey, db)

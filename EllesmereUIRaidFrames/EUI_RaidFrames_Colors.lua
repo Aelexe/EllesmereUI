@@ -745,7 +745,7 @@ do
             if not unit then return sample end
             local v = get(unit) or 0
             if abr then return AbbreviateNumbers(v) end
-            return sformat("%s", C_StringUtil.TruncateWhenZero(v) or "")
+            return C_StringUtil.TruncateWhenZero(v)
         end
     end
 
@@ -793,33 +793,44 @@ do
     ns.RF_TextTags = CATALOG
 
     -- Compiled once per parse (the engine caches parses per template): fmt, the
-    -- pieces in tag order, their count and the value classes the template reads.
+    -- pieces in tag order, each piece's value class (cls), their count and the value
+    -- classes the template reads.
     local compiled = setmetatable({}, { __mode = "k" })
     function ns.RF_CustomCompile(template)
         local parsed = TextTags.Parse(CATALOG, template)
         if not parsed then return nil end
         local cc = compiled[parsed]
         if cc then return cc end
-        local keys, map, pieces = parsed.keys, CATALOG.map, {}
-        for i = 1, #keys do pieces[i] = map[keys[i]] end
-        cc = { fmt = parsed.fmt, pieces = pieces, n = #keys, reads = parsed.reads }
+        local keys, map, pieces, cls = parsed.keys, CATALOG.map, {}, {}
+        for i = 1, #keys do pieces[i], cls[i] = map[keys[i]], SCHEMA[keys[i]].reads end
+        cc = { fmt = parsed.fmt, pieces = pieces, cls = cls, n = #keys, reads = parsed.reads }
         compiled[parsed] = cc
         return cc
     end
     local Compile = ns.RF_CustomCompile
 
     -- Paints a template; returns the value classes it reads (TextTags' reads set),
-    -- or false (blank) for a missing or empty one.
+    -- or false (blank) for a missing or empty one. args: a button's values for this
+    -- text, kept between paints; a / b: only the pieces reading those classes are
+    -- read again, the rest keep their values (a nil, a new template or no args:
+    -- every piece, as on the previews).
     local scratch = {}
-    local function CustomTextInto(fs, template, unit, s, pv)
+    local function CustomTextInto(fs, template, unit, s, pv, args, a, b)
         local cc = Compile(template)
         if not cc then
             fs:SetText("")
             return false
         end
-        local pieces, n = cc.pieces, cc.n
-        for k = 1, n do scratch[k] = pieces[k](unit, s, pv) end
-        fs:SetFormattedText(cc.fmt, unpack(scratch, 1, n))
+        if not args then
+            args, a = scratch, nil
+        elseif args.cc ~= cc then
+            args.cc, a = cc, nil
+        end
+        local pieces, cls, n = cc.pieces, cc.cls, cc.n
+        for k = 1, n do
+            if not a or cls[k] == a or cls[k] == b then args[k] = pieces[k](unit, s, pv) end
+        end
+        fs:SetFormattedText(cc.fmt, unpack(args, 1, n))
         return cc.reads
     end
     ns.RF_CustomTextInto = CustomTextInto

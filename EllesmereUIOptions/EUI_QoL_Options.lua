@@ -1885,6 +1885,47 @@ initFrame:SetScript("OnEvent", function(self)
             EllesmereUI.RegisterWidgetRefresh(refresh)
         end
 
+        -- Row 6: Transparent World Map Sidebars (left) |. Not offered on WoW Forever:
+        -- Forever Essentials has its own map background option there.
+        if not EllesmereUI.IS_FOREVER then
+            local sidebarsRow
+            sidebarsRow, h = W:DualRow(parent, y,
+                { type="toggle", text="Transparent World Map Sidebars",
+                  tooltip="Makes the black bars beside the maximized world map transparent, and lets you click, turn the camera and zoom through them. Use the cog to set their opacity.",
+                  getValue=function()
+                      return EllesmereUIDB and EllesmereUIDB.mapSidebarsClear or false
+                  end,
+                  setValue=function(v)
+                      if not EllesmereUIDB then EllesmereUIDB = {} end
+                      EllesmereUIDB.mapSidebarsClear = v
+                      if EllesmereUI._applyMapSidebars then EllesmereUI._applyMapSidebars() end
+                      EllesmereUI:RefreshPage()
+                  end },
+                EllesmereUI.BlankRowCfg()
+            );  y = y - h
+            -- Cog on Transparent World Map Sidebars (left region)
+            if not EllesmereUI._prebuilding then
+                local function sidebarsOff()
+                    return not (EllesmereUIDB and EllesmereUIDB.mapSidebarsClear)
+                end
+                EllesmereUI.BuildInlineCog(sidebarsRow._leftRegion, {
+                    title = "World Map Sidebars Settings",
+                    rows = {
+                        { type = "slider", label = "Opacity", min = 0, max = 100, step = 5,
+                          get = function()
+                              return (EllesmereUIDB and EllesmereUIDB.mapSidebarsOpacity) or 0
+                          end,
+                          set = function(v)
+                              if not EllesmereUIDB then EllesmereUIDB = {} end
+                              EllesmereUIDB.mapSidebarsOpacity = v
+                              if EllesmereUI._applyMapSidebars then EllesmereUI._applyMapSidebars() end
+                          end },
+                    },
+                    gap = 9, disabled = sidebarsOff, disabledTooltip = "Transparent World Map Sidebars",
+                })
+            end
+        end
+
         _, h = W:Spacer(parent, y, 20);  y = y - h
 
         ---------------------------------------------------------------------------

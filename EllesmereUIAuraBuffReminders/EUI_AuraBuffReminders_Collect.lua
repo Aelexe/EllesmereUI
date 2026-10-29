@@ -507,9 +507,10 @@ end
 
 local function CollectConsumables(missing, playerClass, specID, inInstance, inKeystone, inCombat)
 local co = db.profile.consumables
--- Class specials (poisons/rites/imbues/shields) share one "Where to Show"
--- set (they are class-exclusive; per-spell visibility would be meaningless).
-local specialsActive = EABR.SectionShows(co.specialsWhereToShow, inInstance)
+-- Class specials (poisons/rites/imbues/shields) follow the "Where to Show"
+-- of the player's class section.
+local specialFields = EABR.SPECIALS[playerClass]
+local specialsActive = EABR.SectionShows(EABR.SpecialsWhere(co, specialFields and specialFields.where), inInstance)
 -- The trackable subset (weapon enchants, poisons, rites, imbues, Earth
 -- Shield) runs in combat / M+ too; where reminders appear is governed
 -- per-section by "Where to Show". Non-trackable emitters below either
@@ -525,7 +526,7 @@ local specialsActive = EABR.SectionShows(co.specialsWhereToShow, inInstance)
         end
         if needResolve then EABR.ResolveConsumables() end
 
-        -- === SPECIALS (share the class-specials "Where to Show") ===
+        -- === SPECIALS (per-class "Where to Show") ===
         if specialsActive then
             -- Rogue Poisons: unified scan counts active per category vs required (1 each, 2 with Dragon-Tempered Blades); shows the first enabled+known+missing poison per deficient category.
             if playerClass == "ROGUE" then

@@ -343,8 +343,15 @@ local function PaintHealAbsorb(fs, e, unit, s, gone)
     Tint(fs, e, unit, s)
 end
 
-local function PaintCustom(fs, e, unit, s)
-    ns.RF_CustomTextInto(fs, s[e.k.CustomFormat], unit, s)
+-- d._txArgs[i]: the values text i was last painted with on this button. A repaint for
+-- value classes a / b reads only the tags reading them (a health tick never resolves
+-- the name again); a full paint (a nil) reads every tag.
+local function PaintCustom(fs, e, unit, s, d, a, b)
+    local all = d._txArgs
+    if not all then all = {}; d._txArgs = all end
+    local args = all[e.i]
+    if not args then args = {}; all[e.i] = args end
+    ns.RF_CustomTextInto(fs, s[e.k.CustomFormat], unit, s, nil, args, a, b)
 end
 
 -- The full paint's share: every text but Power Text (the power paint owns it).
@@ -365,7 +372,7 @@ function ns.RF_TextFull(d, s, unit)
                 Tint(fs, e, unit, s)
             end
         elseif kind == "custom" then
-            PaintCustom(fs, e, unit, s)
+            PaintCustom(fs, e, unit, s, d)
             Tint(fs, e, unit, s)
         elseif kind == "hp" then
             if gone then
@@ -380,7 +387,8 @@ function ns.RF_TextFull(d, s, unit)
     end
 end
 
--- Name and Level texts only (nickname changes, UNIT_LEVEL).
+-- Name and Level texts and the Custom texts' names and levels (nickname changes,
+-- UNIT_LEVEL).
 function ns.RF_TextNames(d, unit)
     local p = d._txP
     if not p then return end
@@ -397,6 +405,7 @@ function ns.RF_TextNames(d, unit)
     if l then
         for j = 1, #l do ns._RFLevelInto(pool[l[j].i], unit) end
     end
+    if p.reads and p.reads.id then ns.RF_TextRepaintCustom(d, unit, "id") end
 end
 
 -- Heal Absorb Texts (the absorb-only event path).
@@ -417,7 +426,7 @@ function ns.RF_TextRepaintCustom(d, unit, a, b)
     for j = 1, #l do
         local e = l[j]
         local er = e.reads
-        if er and (er[a] or (b and er[b])) then PaintCustom(pool[e.i], e, unit, s) end
+        if er and (er[a] or (b and er[b])) then PaintCustom(pool[e.i], e, unit, s, d, a, b) end
     end
 end
 local RepaintCustom = ns.RF_TextRepaintCustom
@@ -505,7 +514,7 @@ function ns.RF_TextHealth(d, unit, pct, gone, allCustom)
     if l then PowerLife(d, l, unit, gone) end
     l = allCustom and p.custom
     if l then
-        for j = 1, #l do PaintCustom(pool[l[j].i], l[j], unit, s) end
+        for j = 1, #l do PaintCustom(pool[l[j].i], l[j], unit, s, d) end
     elseif p.reads and p.reads.hp then
         RepaintCustom(d, unit, "hp")
     end

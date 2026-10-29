@@ -453,7 +453,7 @@ local PLAYER_POWER_DEFAULT = {
     MONK   = { [2] = 0 },   -- Mistweaver: default to Mana
 }
 local PLAYER_POWER_ALT = {
-    DRUID  = { [1] = 0, [2] = 0, [3] = 0 },  -- Balance/Feral/Guardian -> Mana
+    DRUID  = { [1] = 0, [2] = 0, [3] = 0, [4] = 0 },  -- All druid specs -> Mana
     PRIEST = { [3] = nil },                     -- Shadow alt -> Insanity (UnitPowerType)
     SHAMAN = { [1] = 0 },                       -- Elemental -> Mana
 }
@@ -487,7 +487,7 @@ function EllesmereUI.GetPlayerPowerOverride()
     local ov = db.profile.player and db.profile.player.powerTypeOverride
     local choice = sid and ov and ov[sid]
     if choice == "astral" then
-        -- Balance "Astral Power (Except Cat & Bear)", saved only under its spec
+        -- Balance "Astral Power", saved only under its spec
         -- ID: Cat and Bear Form (form IDs 1 and 5) keep their own power, every
         -- other form shows Astral Power.
         local f = GetShapeshiftFormID()
