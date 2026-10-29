@@ -11,7 +11,7 @@ local EQT = ns.EQT
 local HEIGHT_MIN, HEIGHT_MAX, HEIGHT_STEP = 400, 1000, 10
 
 local emAnchor = { relativeTo = "UIParent" }
-local hooked, changed, reloadOffered, resetPending, syncQueued, standIn, standInPlaced
+local hooked, changed, reloadOffered, resetPending, syncQueued, standIn, standInPlaced, sessionHeight
 
 -- Until its Edit Mode layout applies, the managed container places it.
 local function Held()
@@ -153,8 +153,7 @@ end
 function EQT.SyncPosition()
     syncQueued = nil
     local cfg = EQT.DB()
-    -- Leaving Edit Mode re-applies the layout, which syncs again.
-    if not cfg.position or EllesmereUI._unlockActive or EllesmereUI.EditModeOpen() then return end
+    if not cfg.position or EllesmereUI._unlockActive then return end
     if InCombatLockdown() then
         ns.CombatQueue.Defer("QTPosition", EQT.SyncPosition)
         return
@@ -169,6 +168,8 @@ function EQT.SyncPosition()
             C_Timer.After(0, EQT.SyncPosition)
         end)
     end
+    -- Leaving Edit Mode re-applies the layout, which syncs again.
+    if EllesmereUI.EditModeOpen() then return end
     local userChange = changed
     changed = nil
     if WriteLayout(cfg) == "preset" then
@@ -247,10 +248,14 @@ function EQT.InitPosition()
 
     -- Layout writes and reload prompts wait for the session to close.
     EllesmereUI:RegisterUnlockModeListener("EllesmereUIQuestTracker", function(active, closeAction)
-        if active then return end
+        if active then
+            sessionHeight = EQT.DB().height
+            return
+        end
         standInPlaced = nil
-        -- Exiting without saving put the old spot and height back.
-        if closeAction ~= "save" then changed = nil end
+        -- The discard revert sets the snapshot height even when none was stored.
+        if closeAction ~= "save" then EQT.Set("height", sessionHeight) end
+        if closeAction ~= "save" or not EQT.DB().position then changed = nil end
         if resetPending then ApplyReset() end
         EQT.SyncPosition()
     end)
