@@ -436,10 +436,12 @@ do
     end
 end
 
--- the disabled categories as one string, for the memo and the signature
+-- the settings classifying reads (disabled categories, split set gear) as one
+-- string, for the memo and the signature
 local function DisabledKey()
-    local dis = ""
-    for k in pairs(BP().bagDisabledCategories or _emptyP) do dis = dis .. k .. "," end
+    local p = BP()
+    local dis = p.bagSplitSetGearBySet and "split|" or ""
+    for k in pairs(p.bagDisabledCategories or _emptyP) do dis = dis .. k .. "," end
     return dis
 end
 
@@ -467,10 +469,11 @@ end
 -- sidebar counts and repaints share it. a pass still waiting on item data
 -- runs again. bags: it's a bags list, so the 6th container is the reagent bag.
 -- src: the saved list it came from (a one-tab view wraps one of its tabs)
-local pass = {}
+local passes = setmetatable({}, { __mode = "k" })
 local function Classified(list, bags, src)
     local rev, dis = Offline.ListRev(src or list), DisabledKey()
-    if pass.list == list and pass.rev == rev and pass.cat == catGen and pass.dis == dis
+    local pass = list and passes[list]
+    if pass and pass.rev == rev and pass.cat == catGen and pass.dis == dis
         and pass.bags == bags and not pass.waiting then
         return pass.items, pass.used, pass.total
     end
@@ -515,8 +518,10 @@ local function Classified(list, bags, src)
         end
     end
     if wait then waiting = true end
-    pass.list, pass.rev, pass.cat, pass.dis, pass.bags, pass.waiting = list, rev, catGen, dis, bags, wait
-    pass.items, pass.used, pass.total = items, used, total
+    if list then
+        passes[list] = { rev = rev, cat = catGen, dis = dis, bags = bags, waiting = wait,
+            items = items, used = used, total = total }
+    end
     return items, used, total
 end
 
@@ -1034,6 +1039,7 @@ if EUI_Bank then
     if EUI_Bank.RefreshBank then hooksecurefunc(EUI_Bank, "RefreshBank", SyncBank) end
     EUI_Bank:HookScript("OnShow", SyncBank)
     EUI_Bank:HookScript("OnHide", function()
+        if EUI_Bank:IsShown() then return end
         bankView.key, bankView.viewTab = nil, "bank"
         if bankView.mode then Place(bankView, nil) end
     end)
