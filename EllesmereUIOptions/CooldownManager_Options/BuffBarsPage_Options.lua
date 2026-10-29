@@ -177,7 +177,7 @@ local function InitBuffBarsPage(PP, DB, Refresh, FONT_PATH, GetCDMOptOutline, Ga
         local unassigned = (not cfg.spellID or cfg.spellID == 0) and not cfg.glowBased
         -- Name (same resolution as the live build)
         if wrap._nameText and wrap._nameText:IsShown() then
-            local displayName = cfg.name
+            local displayName = (cfg.customName and cfg.customName ~= "") and cfg.customName or cfg.name
             if (not displayName or displayName == "" or displayName == "New Bar")
                and cfg.spellID and cfg.spellID > 0 then
                 local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(cfg.spellID)
@@ -3705,6 +3705,45 @@ local function InitBuffBarsPage(PP, DB, Refresh, FONT_PATH, GetCDMOptOutline, Ga
                       set = function(v)
                           local bd = SelectedTBB(); if not bd then return end
                           bd.nameY = v; RefreshTBB()
+                      end },
+                },
+            })
+        end
+        -- Cog on Name Text: custom display name override
+        do
+            local rgn = nameRow._leftRegion
+            EllesmereUI.BuildInlineCog(rgn, {
+                title = "Custom Name Text",
+                icon = "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-edit.png",
+                tip = "Custom display name",
+                disabled = function()
+                    local bd = SelectedTBB()
+                    if bd and bd.verticalOrientation then return true end
+                    local pos = bd and bd.namePosition
+                    if not pos then pos = (bd and bd.showName ~= false) and "left" or "none" end
+                    return pos == "none"
+                end,
+                disabledTooltip = function()
+                    local bd = SelectedTBB()
+                    if bd and bd.verticalOrientation then return "Horizontal Orientation (name text is not shown on vertical bars)" end
+                    return "This option requires a Name Text position other than None"
+                end,
+                rows = {
+                    { type = "input", label = "Custom Name", inputWidth = 120, commitOnBlur = true,
+                      get = function()
+                          local bd = SelectedTBB()
+                          return bd and bd.customName or ""
+                      end,
+                      set = function(text)
+                          local bd = SelectedTBB(); if not bd then return end
+                          bd.customName = (text ~= "" and text or nil)
+                          RefreshTBB()
+                      end },
+                    { type = "button", label = "Reset to Default",
+                      action = function()
+                          local bd = SelectedTBB(); if not bd then return end
+                          bd.customName = nil
+                          RefreshTBB()
                       end },
                 },
             })

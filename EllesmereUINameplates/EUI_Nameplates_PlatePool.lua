@@ -617,6 +617,11 @@ local frameCache = CreateFramePool("Frame", UIParent, nil, nil, false, function(
         -- Rounded corners, Join Cast Bar: the health bar's bottom corners follow the cast bar
         -- (a corners-only pass while nothing else about the health bar's rounding moved).
         if owner and owner._npJoinCast then ns.NP_ApplyRounding(owner, "health", true) end
+        -- A cast end may turn the caster back (cast starts repaint in Cast.lua). The
+        -- unit check skips a plate ClearUnit is releasing.
+        if ns._npTgtTexts and owner and owner.unit and not self:IsShown() then
+            owner:RefreshTargetTexts()
+        end
     end
     plate.cast:HookScript("OnShow", OnCastVisibilityChanged)
     plate.cast:HookScript("OnHide", OnCastVisibilityChanged)

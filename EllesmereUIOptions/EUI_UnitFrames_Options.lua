@@ -34,13 +34,12 @@ if EllesmereUI.IS_FOREVER then
     ns._threatPctPositionOrder = { "RIGHT", "LEFT", "CENTER", "OUTRIGHT", "OUTLEFT" }
 end
 
--- Settings-cog rows of a text slot that can show a name. WoW Forever puts its
--- Name Format row at the top (the name's first word, its last word, or all of
--- it -- unset); every other client gets rows back untouched. prefix is the
--- slot's key prefix ("leftText", "btbLeft"): content at <prefix>Content, format
--- at <prefix>NameFormat. get(key, default) / set(key, v) are the page's
--- accessors. On ns for the same upvalue cap.
-if EllesmereUI.IS_FOREVER then
+-- Settings-cog rows of a text slot that can show a name. Name Format offers
+-- the full name, one word, initials, or a character cap. prefix is the slot's
+-- key prefix ("leftText", "btbLeft"): content at <prefix>Content, format at
+-- <prefix>NameFormat. get(key, default) / set(key, v) are the page's accessors.
+-- On ns for the same upvalue cap.
+if EllesmereUI.NAME_FORMAT_VALUES then
     local HAS_NAME = { name = true, levelname = true, namelevel = true, nametotarget = true, targetname = true }
     local FORMATS, FORMAT_ORDER = EllesmereUI.NAME_FORMAT_VALUES, EllesmereUI.NAME_FORMAT_ORDER
     -- A custom format shows a name when its parse holds a name tag.
@@ -62,10 +61,9 @@ if EllesmereUI.IS_FOREVER then
             disabledTooltip="This option only applies when the text shows a name." })
         return rows
     end
-    -- The same slots for the Forever Essentials NAME FORMAT section, which
-    -- reads and sets every name text at once: { unit settings key, content key, custom format key,
-    -- format key, text bar slot }, keys prebuilt so its reads build no strings.
-    -- Boss frames have no text bar; the other mini frames no extra text either.
+    -- The same slots for the Forever Essentials NAME FORMAT section. That
+    -- page exists on WoW Forever only.
+    if EllesmereUI.IS_FOREVER then
     do
         local MAIN = { "leftText", "rightText", "centerText", "extraText", "btbLeft", "btbRight", "btbCenter" }
         local BOSS = { "leftText", "rightText", "centerText", "extraText" }
@@ -85,6 +83,7 @@ if EllesmereUI.IS_FOREVER then
                 format = "powerTextNameFormat", power = "powerPercentText" }
         end
         ns.UF_NAME_FORMAT_SLOTS = slots
+    end
     end
 else
     function ns.UF_NameFormatRows(_, _, _, _, rows) return rows end
@@ -869,7 +868,7 @@ local function HideExhaustionRow(getS, onChanged)
         tooltip = "Hides Sated, Exhaustion, Temporal Displacement and the other Bloodlust lockout debuffs.",
         get = function() return getS().debuffHideExhaustion ~= false end,
         set = function(v)
-            getS().debuffHideExhaustion = (not v) and false or nil
+            if v then getS().debuffHideExhaustion = nil else getS().debuffHideExhaustion = false end
             onChanged()
         end }
 end

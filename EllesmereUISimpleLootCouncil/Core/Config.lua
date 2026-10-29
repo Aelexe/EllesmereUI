@@ -98,6 +98,7 @@ local function SharedResponses(list)
         end
         responses[index] = {
             id = "SHARED" .. index, text = text, r = r, g = g, b = b, sort = sort,
+            autoroll = entry.a == true or nil,
         }
     end
 
@@ -151,10 +152,13 @@ function Config:ApplyShared(config, sender)
         end
     end
 
-    if type(config.councilBags) == "boolean" then
-        next_.councilBags = config.councilBags
-    elseif config.councilBags ~= nil then
-        Malformed("councilBags", sender)
+    for _, field in ipairs({ "startRequests", "councilMayStartRuns", "councilBags" }) do
+        local value = config[field]
+        if type(value) == "boolean" then
+            next_[field] = value
+        elseif value ~= nil then
+            Malformed(field, sender)
+        end
     end
 
 
@@ -203,21 +207,63 @@ end
 
 
 
+
+local function Held()
+    if not shared then return nil end
+    if addon.Council and addon.Council.IsAuthor and IsInGroup() and addon.Council.IsAuthor() then
+        return nil
+    end
+    return shared
+end
+
+
 function Config:Responses()
-    return (shared and shared.responses) or (addon.db and addon.db.responses) or {}
+    local held = Held()
+    return (held and held.responses) or (addon.db and addon.db.responses) or {}
 end
 
 function Config:Vote()
-    return (shared and shared.vote) or (addon.db and addon.db.vote) or {}
+    local held = Held()
+    return (held and held.vote) or (addon.db and addon.db.vote) or {}
 end
 
 function Config:NoteMax()
-    return (shared and shared.noteMax) or (addon.db and addon.db.noteMaxLength) or 64
+    local held = Held()
+    return (held and held.noteMax) or (addon.db and addon.db.noteMaxLength) or 64
 end
+
+
+
+local QUEUE_MODES = { off = true, request = true, start = true }
+function Config.CleanCouncilQueue(value)
+    return QUEUE_MODES[value] and value or "off"
+end
+
+
+
+function Config:StartRequestsAllowed()
+    local held = Held()
+    if held then return held.startRequests == true end
+    return Config.CleanCouncilQueue(addon.db and addon.db.councilQueue) ~= "off"
+end
+
+function Config:CouncilMayStartRuns()
+    if not self:StartRequestsAllowed() then return false end
+    local held = Held()
+    if held then return held.councilMayStartRuns == true end
+    return Config.CleanCouncilQueue(addon.db and addon.db.councilQueue) == "start"
+end
+
+function Config:CouncilQueueMode()
+    if not self:StartRequestsAllowed() then return "off" end
+    return self:CouncilMayStartRuns() and "start" or "request"
+end
+
 
 function Config:CouncilBagsShared()
 
-    if shared then return shared.councilBags == true end
+    local held = Held()
+    if held then return held.councilBags == true end
     return addon.db and addon.db.shareCouncilBags == true or false
 end
 
@@ -231,6 +277,8 @@ local function OwnsDelegation()
     return true
 end
 
+
+
 function Config:LootMaster()
     if shared then return shared.lootMaster end
     if not OwnsDelegation() then return nil end
@@ -242,11 +290,17 @@ end
 
 function Config:RulesSettled()
     return shared ~= nil or OwnsDelegation()
+        or (addon.Council and addon.Council.IsAuthor and addon.Council.IsAuthor()) or false
 end
 
 
 
-function Config:LeaderDictates()
-    if OwnsDelegation() then return false end
-    return addon.Loot and addon.Loot.handling and true or false
+
+
+function Config:LootMasterDictates()
+    if not (addon.Loot and addon.Loot.handling) then return false end
+    if not addon.PlayerIsMasterLooter then return false end
+    return not addon.PlayerIsMasterLooter()
 end
+
+Config.LeaderDictates = Config.LootMasterDictates

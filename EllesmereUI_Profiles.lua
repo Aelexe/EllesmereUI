@@ -178,6 +178,7 @@ local KEY_PREFIX_FOLDER = {
     ["ERB_"]   = "EllesmereUIResourceBars",
     ["ECHAT_"] = "EllesmereUIChat",
     ["EBS_"]   = "EllesmereUIMinimap",
+    ["EQT_"]   = "EllesmereUIQuestTracker",
     ["EDR_"]   = "EllesmereUIBlizzardSkin",
     ["EMT_"]   = "EllesmereUIMythicTimer",
     ["EABR_"]  = "EllesmereUIAuraBuffReminders",
@@ -2114,7 +2115,7 @@ do
         "reskinTrainer", "reskinGossip", "reskinQuest", "reskinInspectRecipe",
         "reskinDelves", "reskinSocialUI",
         "reskinQueueStatus", "reskinDelvePicker", "reskinPlayerChoice",
-        "reskinTrade",
+        "reskinTrade", "reskinFlagCarriers",
         -- The per-look window slots ride with the enables they describe.
         "windowSkinStyleSlots",
         "blizzWindowSkinStyles", "blizzWindowModernDefault",

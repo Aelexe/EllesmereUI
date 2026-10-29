@@ -159,6 +159,22 @@ initFrame:SetScript("OnEvent", function(self)
                     EllesmereUI.BlankRowCfg()
                 ); y = y - h
 
+                -- offline bank (not on wow forever). account-wide, like the data it saves
+                local Offline = BagsNS and BagsNS.Offline
+                if Offline then
+                    _, h = W:SectionHeader(parent, "OFFLINE BANK", y); y = y - h
+                    _, h = W:DualRow(parent, y,
+                        { type="toggle", text="Offline Bank",
+                          tooltip="Saves each character's bags and bank, and the warband bank, when you see them. Use the person button by the bags or bank title to see another character's bags or bank, and Bank in the bags sidebar for their bank or the warband bank, from anywhere. Applies to all characters.",
+                          getValue=function() return Offline.Enabled() end,
+                          setValue=function(v) Offline.Set("bagOfflineBank", v) end },
+                        { type="toggle", text="Tooltip Item Counts",
+                          tooltip="Item tooltips list how many of that item each of your characters has in their bags and bank, plus the warband bank. Applies to all characters.",
+                          getValue=function() return Offline.CountsEnabled() end,
+                          setValue=function(v) Offline.Set("bagTooltipCounts", v) end }
+                    ); y = y - h
+                end
+
                 _, h = W:Spacer(parent, y, 20); y = y - h
                 return math.abs(y)
                 end) -- end pcall
@@ -181,6 +197,20 @@ initFrame:SetScript("OnEvent", function(self)
                 bags._asMaxGridW = nil
                 bags._asMaxH = nil
                 if bags.RefreshInventory then bags:RefreshInventory() end
+            end
+
+            -- slot size / spacing: the sliders fire every step while dragging,
+            -- so the windows lay out once per frame at most
+            local relayoutQueued = false
+            local function RelayoutSoon()
+                if relayoutQueued then return end
+                relayoutQueued = true
+                C_Timer.After(0, function()
+                    relayoutQueued = false
+                    ResetAndRefreshBagLayout()
+                    local bank = _G.EUI_BankFrame
+                    if bank and bank:IsVisible() and bank.RefreshBank then bank:RefreshBank() end
+                end)
             end
 
             local BagsNS = EllesmereUI._ModuleNS["EllesmereUIBags"]
@@ -258,6 +288,20 @@ initFrame:SetScript("OnEvent", function(self)
                           _G.EUI_Bags:ApplyWindowLayering()
                       end
                   end },
+                { type="slider", text="Slot Size", min=24, max=56, step=1,
+                  tooltip="Size of each item slot in bags and bank.",
+                  getValue=function() return db.profile.bagSlotSize or 34 end,
+                  setValue=function(v)
+                      db.profile.bagSlotSize = v
+                      RelayoutSoon()
+                  end },
+                { type="slider", text="Slot Spacing", min=0, max=12, step=1,
+                  tooltip="Space between item slots in bags and bank.",
+                  getValue=function() return db.profile.bagSlotSpacing or 4 end,
+                  setValue=function(v)
+                      db.profile.bagSlotSpacing = v
+                      RelayoutSoon()
+                  end },
             }
             -- The List display has no Auto-Size to Fit (its rows take the grip-set width)
             if not bagList then
@@ -272,6 +316,47 @@ initFrame:SetScript("OnEvent", function(self)
                       ResetAndRefreshBagLayout()
                   end }
             end
+            -- background color/opacity and slot background, same for bags and bank
+            local function ApplyBackgrounds()
+                local bags, bank = _G.EUI_Bags, _G.EUI_BankFrame
+                if bags then BagsNS.ApplyWindowBackground(bags.bg, bags.bgOverlay) end
+                if bank then BagsNS.ApplyWindowBackground(bank._bg, bank._bgOverlay) end
+            end
+            local function RefreshWindows()
+                if _G.EUI_Bags and _G.EUI_Bags:IsVisible() and _G.EUI_Bags.RefreshInventory then _G.EUI_Bags:RefreshInventory() end
+                local bank = _G.EUI_BankFrame
+                if bank and bank:IsVisible() and bank.RefreshBank then bank:RefreshBank() end
+            end
+            layoutSlots[#layoutSlots + 1] = { type="colorpicker", text="Background Color", hasAlpha=true,
+                tooltip="The tint over the bag and bank window backgrounds. Its opacity sets how strong the tint is.",
+                getValue=function()
+                    local c = db.profile.bagBgColor
+                    if c then return c.r, c.g, c.b, c.a or 0.25 end
+                    return 0, 0, 0, 0.25
+                end,
+                setValue=function(r, g, b, a)
+                    db.profile.bagBgColor = { r = r, g = g, b = b, a = a }
+                    ApplyBackgrounds()
+                end }
+            layoutSlots[#layoutSlots + 1] = { type="slider", text="Background Opacity", min=0, max=100, step=5,
+                tooltip="How see-through the bag and bank window backgrounds are. Items, the header and the sidebar stay as they are.",
+                getValue=function() return db.profile.bagBgOpacity or 100 end,
+                setValue=function(v)
+                    db.profile.bagBgOpacity = v
+                    ApplyBackgrounds()
+                end }
+            layoutSlots[#layoutSlots + 1] = { type="colorpicker", text="Slot Background", hasAlpha=true,
+                tooltip="The color and opacity of empty item slots in the bags and bank.",
+                getValue=function()
+                    local c = db.profile.bagSlotBgColor
+                    if c then return c.r, c.g, c.b, c.a or 1 end
+                    return 1, 1, 1, 1
+                end,
+                setValue=function(r, g, b, a)
+                    db.profile.bagSlotBgColor = { r = r, g = g, b = b, a = a }
+                    -- the picker fires every frame while dragging: retint, don't re-lay out
+                    if BagsNS and BagsNS.RetintSlotBackgrounds then BagsNS.RetintSlotBackgrounds() else RefreshWindows() end
+                end }
             for i = 1, #layoutSlots, 2 do
                 _, h = W:DualRow(parent, y, layoutSlots[i], layoutSlots[i + 1] or EllesmereUI.BlankRowCfg()); y = y - h
             end
@@ -1128,6 +1213,16 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.dataBarsGold = nil
                 EllesmereUIDB.warbandGold = nil
                 EllesmereUIDB.bagCurrencyByChar = nil
+                -- offline bank: its switches and every saved inventory
+                EllesmereUIDB.bagOfflineBank = nil
+                EllesmereUIDB.bagTooltipCounts = nil
+            end
+            local bagsNS = EllesmereUI._ModuleNS and EllesmereUI._ModuleNS["EllesmereUIBags"]
+            local Offline = bagsNS and bagsNS.Offline
+            if Offline then
+                Offline.Wipe()
+                Offline.Sync()
+                Offline.SyncButton()
             end
             EllesmereUI:InvalidatePageCache()
         end,

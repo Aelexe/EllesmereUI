@@ -123,7 +123,7 @@ EllesmereUI._LEGENDS = {
         "Natasi", "Drekonus", "Quiim", "Keato03",
         "Capa", "e_luvin", "ccpoppin1", "Arjax",
         "Excelvior", "Marple_V", "shy_x00", "Ferniss",
-        "Vall", "Collie",
+        "Vall", "Collie", "arxTank",
     },
 }
 -- END GENERATED DONORS
