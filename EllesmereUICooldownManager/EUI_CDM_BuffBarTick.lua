@@ -444,6 +444,10 @@ function ns.UpdateTrackedBuffBarTimers()
                     --     cooldownInfo override/spellID/linkedSpellIDs).
                     --  3. The configured spell's name (deterministic).
                     if content and bar._nameText and bar._nameText:IsShown() then
+                        if cfg.customName and cfg.customName ~= "" then
+                            bar._nameText:SetText(cfg.customName)
+                            bar._nameSet = true
+                        else
                         local nameStr
                         -- auraInstanceID may itself be SECRET on the active frame
                         -- (probe-confirmed): type() reads the tag without touching
@@ -520,6 +524,7 @@ function ns.UpdateTrackedBuffBarTimers()
                         if nameStr then
                             bar._nameText:SetText(nameStr)
                             bar._nameSet = true
+                        end
                         end
                     end
                     -- Timer: engine-bound decimal mirror first (the engine formats the secret
@@ -726,11 +731,17 @@ function ns.UpdateTrackedBuffBarTimers()
                     bar._icon._tex:SetTexture(fbAura.icon)
                     bar._lastIconSID = nil
                 end
-                local fbName = fbAura.name
-                if bar._nameText and bar._nameText:IsShown() and fbName
-                   and not (isSec and isSec(fbName)) then
-                    bar._nameText:SetText(fbName)
-                    bar._nameSet = true
+                if bar._nameText and bar._nameText:IsShown() then
+                    if cfg.customName and cfg.customName ~= "" then
+                        bar._nameText:SetText(cfg.customName)
+                        bar._nameSet = true
+                    else
+                        local fbName = fbAura.name
+                        if fbName and not (isSec and isSec(fbName)) then
+                            bar._nameText:SetText(fbName)
+                            bar._nameSet = true
+                        end
+                    end
                 end
                 -- Extras stay quiet in fallback mode: no Blizzard child to read stacks/pandemic from. Skipped when the stack fill drove them.
                 if not (sb and fbStackFill) then
@@ -772,11 +783,16 @@ function ns.UpdateTrackedBuffBarTimers()
     -- Deferred name fill: retry each tick when BuildTrackedBuffBars could not resolve the spell name (spell data not loaded yet).
     for i, cfg in ipairs(bars) do
         local bar = tbbFrames[i]
-        if bar and bar._nameText and not bar._nameSet and cfg.spellID and cfg.spellID > 0 then
-            local si = C_Spell.GetSpellInfo(cfg.spellID)
-            if si and si.name then
-                bar._nameText:SetText(si.name)
+        if bar and bar._nameText and not bar._nameSet then
+            if cfg.customName and cfg.customName ~= "" then
+                bar._nameText:SetText(cfg.customName)
                 bar._nameSet = true
+            elseif cfg.spellID and cfg.spellID > 0 then
+                local si = C_Spell.GetSpellInfo(cfg.spellID)
+                if si and si.name then
+                    bar._nameText:SetText(si.name)
+                    bar._nameSet = true
+                end
             end
         end
     end
