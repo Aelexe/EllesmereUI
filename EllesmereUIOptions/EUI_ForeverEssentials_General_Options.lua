@@ -96,8 +96,9 @@ local function NameFormatSources()
             end }
     end
 
-    -- Nameplates: the enemy name and Target of Target slots (a pick sets every
-    -- slot's key, so a text moved later keeps it), then the friendly players.
+    -- Nameplates: the enemy name, Target of Target and Custom slots showing a name
+    -- or a target (a pick sets every slot's key, so a text moved later keeps it),
+    -- then the friendly players.
     local np = MNS("EllesmereUINameplates")
     if np and np.db then
         local slotKeys, formatKey = np.textSlotKeys, {}
@@ -108,6 +109,13 @@ local function NameFormatSources()
                 local nameSlot, totSlot = np.FindNameSlot(), np._npToTSlot
                 if nameSlot then m = ModeOf(p[formatKey[nameSlot]]) end
                 if totSlot then m = Merge(m, ModeOf(p[formatKey[totSlot]])) end
+                for i = 1, #slotKeys do
+                    local slot = slotKeys[i]
+                    local parsed = p[slot] == "custom" and np.NP_CustomParse(slot)
+                    if parsed and (parsed.has.name or parsed.has.target) then
+                        m = Merge(m, ModeOf(p[formatKey[slot]]))
+                    end
+                end
                 if not m then
                     for i = 1, #slotKeys do m = Merge(m, ModeOf(p[formatKey[slotKeys[i]]])) end
                 end

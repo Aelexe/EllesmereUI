@@ -905,7 +905,8 @@ function ns.ERB_BuildBarDisplayPage(pageName, parent, yOffset)
         -- A spec's third label is an extra choice ("always": Balance's Mana in
         -- every form); tip = the row's tooltip for the class.
         local SPEC_POWER_ALTS = {
-            DRUID  = { [1] = { "Mana (Match Form)", "Astral Power", "Mana (Always)" }, [2] = { "Energy", "Mana" }, [3] = { "Rage", "Mana" },
+            DRUID  = { [1] = { "Match Form", "Astral Power", "Mana" },
+                       [2] = { "Match Form", "Mana" }, [3] = { "Match Form", "Mana" }, [4] = { "Match Form", "Mana" },
                        tip = "The first choice follows your form: Energy in Cat Form, Rage in Bear Form and Mana in the others. The other choices keep their power in every form." },
             PRIEST = { [3] = { "Mana", "Insanity" } },
             SHAMAN = { [1] = { "Mana", "Maelstrom" } },

@@ -2115,7 +2115,7 @@ do
         "reskinTrainer", "reskinGossip", "reskinQuest", "reskinInspectRecipe",
         "reskinDelves", "reskinSocialUI",
         "reskinQueueStatus", "reskinDelvePicker", "reskinPlayerChoice",
-        "reskinTrade",
+        "reskinTrade", "reskinFlagCarriers",
         -- The per-look window slots ride with the enables they describe.
         "windowSkinStyleSlots",
         "blizzWindowSkinStyles", "blizzWindowModernDefault",
