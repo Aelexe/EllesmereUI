@@ -309,6 +309,23 @@ local function Build(v)
     end
     for _, c in pairs({ money:GetChildren() }) do c:EnableMouse(false) end
     v.money, v.moneyName = money, name
+    -- hover says whose gold it is
+    local moneyHit = CreateFrame("Frame", nil, bar)
+    moneyHit:SetPoint("TOPLEFT", money, "TOPLEFT", -5, 5)
+    moneyHit:SetPoint("BOTTOMRIGHT", money, "BOTTOMRIGHT", 5, -5)
+    moneyHit:SetFrameLevel(money:GetFrameLevel() + 10)
+    moneyHit:EnableMouse(true)
+    moneyHit:SetScript("OnEnter", function(self)
+        local text
+        if v.mode == "bank" and TabKind(v) == "warband" then
+            text = EllesmereUI.L("Warband Currency")
+        else
+            local c = Offline.Char(ShownKey(v))
+            text = EllesmereUI.Lf("%1$s's Currency", (c and c.name) or UnitName("player") or "")
+        end
+        EUI.ShowWidgetTooltip(self, text)
+    end)
+    moneyHit:SetScript("OnLeave", function() EUI.HideWidgetTooltip() end)
 
     v.info = bar:CreateFontString(nil, "OVERLAY")
     SetFont(v.info, 11)
