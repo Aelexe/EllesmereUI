@@ -586,7 +586,7 @@ Enter a new name for this indicator:
 Enter a new name:
 Enter a valid debuff spell ID.
 Enter a valid spell ID
-Enter amount in gold:
+Enter an amount:
 Enter at least one tag or character.
 Enter the spell ID to add to this filter.
 Enter the spell ID to always show on nameplates.

@@ -524,10 +524,19 @@ do
 
     -- Shared formatting
     local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:14:14:0:0|t"
+    local SILVER_ICON = "|TInterface\\MoneyFrame\\UI-SilverIcon:14:14:0:0|t"
+    local COPPER_ICON = "|TInterface\\MoneyFrame\\UI-CopperIcon:14:14:0:0|t"
+    -- gold, plus silver and copper if there's any (the warbank takes both)
     local function FormatGold(copper)
         if not copper or copper == 0 then return "0" .. GOLD_ICON end
         local gold = math.floor(copper / 10000)
-        return BreakUpLargeNumbers(gold) .. GOLD_ICON
+        local silver = math.floor(copper / 100) % 100
+        local cop = copper % 100
+        local parts = {}
+        if gold > 0 then parts[#parts + 1] = BreakUpLargeNumbers(gold) .. GOLD_ICON end
+        if silver > 0 then parts[#parts + 1] = silver .. SILVER_ICON end
+        if cop > 0 then parts[#parts + 1] = cop .. COPPER_ICON end
+        return table.concat(parts, " ")
     end
 
     -- Layout: | [10px] [player gold] ... [withdraw] [deposit] [10px] [warband gold] [10px] |
@@ -612,16 +621,13 @@ do
         if not EUI.ShowInputPopup then return end
         EUI:ShowInputPopup({
             title = EllesmereUI.L(title),
-            message = EllesmereUI.L("Enter amount in gold:"),
-            placeholder = "1137",
+            message = EllesmereUI.L("Enter an amount:"),
+            money = true,  -- gold/silver/copper boxes, onConfirm gets copper
             confirmText = ACCEPT,
             cancelText = CANCEL,
             modernBlizz = true,
-            onConfirm = function(text)
-                local gold = tonumber(text)
-                if gold and gold > 0 then
-                    onAccept(gold * 10000)
-                end
+            onConfirm = function(copper)
+                if copper and copper > 0 then onAccept(copper) end
             end,
         })
     end
