@@ -4825,7 +4825,8 @@ L["On Icon"] = "아이콘 중앙"
 L["Preferred Click to Buff"] = "강화 효과 부여 우선 클릭"
 L["Right of Icon"] = "아이콘 오른쪽"
 -- add AuraBuffReminders Tooltip (오라/강화 효과 알림 툴팁)
-L["Pick which content these Warlock reminders appear in.\nRested areas (cities and inns) always stay hidden."] = "흑마법사 관련 알림을 표시할 콘텐츠를 선택합니다.\n휴식 구역(대도시 및 여관)에서는 항상 표시되지 않습니다."
+L["Pick which content these Warlock reminders appear in.\nMissing Pet and Passive Pet use the Where to Show in the Pets section.\nRested areas (cities and inns) always stay hidden."] = "흑마법사 관련 알림을 표시할 콘텐츠를 선택합니다.\n'소환수 없음'과 '소환수 수동 상태'는 소환수 섹션의 '표시 장소'를 따릅니다.\n휴식 구역(대도시 및 여관)에서는 항상 표시되지 않습니다."
+L["Pick which content the Missing Pet and Passive Pet reminders appear in.\nWarlock's Wrong Demon reminder uses the Where to Show in the Warlock section.\nRested areas (cities and inns) always stay hidden."] = "'소환수 없음' 및 '소환수 수동 상태' 알림을 표시할 콘텐츠를 선택합니다.\n흑마법사의 '잘못된 악마 소환' 알림은 흑마법사 섹션의 '표시 장소'를 따릅니다.\n휴식 구역(대도시 및 여관)에서는 항상 표시되지 않습니다."
 L["When on, augment rune/flask/food/weapon reminders still show (dimmed) when you have no matching item in your bags, as a prompt to restock.\nWhen off, they are hidden entirely if you don't carry the item."] = "활성화 시 가방에 해당 소모품이 없더라도 증강 룬/영약/음식/무기 마법부여 알림을 흐리게 표시하여 재충전을 유도합니다.\n비활성화 시 해당 아이템을 소지하고 있지 않으면 알림을 완전히 숨깁니다."
 L["Enable this to display a reminder to untalent\nout of this when it is not needed\n(all other dungeons/raids not selected)."] = "이 설정을 켜면 해당 특성이 불필요한 콘텐츠(선택되지 않은 다른 모든 던전/공격대)에 진입했을 때\n특성을 변경하라는 알림을 표시합니다."
 L["Fullscreen Dialog"] = "전체화면 대화상자"
@@ -5077,6 +5078,7 @@ L["profession specialization ability, by position on this character"] = "전문 
 L["profession's second ability, by position on this character"] = "전문 기술의 두 번째 능력, 이 캐릭터에서의 순서 기준"
 L["profession, by position on this character"] = "전문 기술, 이 캐릭터에서의 순서 기준"
 L["resurrection, chosen for this character"] = "부활, 이 캐릭터에 맞게 선택됨"
+L["random hearthstone, rolled again on each open"] = "무작위 귀환석, 열 때마다 다시 선택됨"
 L["\n|cff66ccffDrag to reorder."] = "\n|cff66ccff끌어서 순서를 바꿉니다."
 L["Last Used Mount"] = "마지막으로 탄 탈것"
 -- 2026-08-13 신규 (빠른 실행 8.8.5: 위치 표시기 항목 톱니)
@@ -6615,6 +6617,7 @@ L["Hide Completed Quests"] = "완료된 퀘스트 숨기기"
 L["Hide Daily & Weekly Quests"] = "일일 및 주간 퀘스트 숨기기"
 L["Hide Low Level Quests"] = "저레벨 퀘스트 숨기기"
 L["Hide When In Raid"] = "공격대 시 숨기기"
+L["Hold Shift to Enable"] = "Shift 키를 누르고 있을 때만 자동 수락/진행"
 L["Hold Shift to Skip"] = "Shift 키를 누르고 있으면 자동 수락/진행 안 함"
 L["Mixed In"] = "기본 섞임"
 L["Objective Complete Sound"] = "목표 완료 효과음"
@@ -8281,7 +8284,7 @@ L["Color Name by Reaction"] = "대상 관계별 이름 색상 적용"
 L["Colors the enemy nameplate name text to match the unit's reaction (Hostile or Neutral) instead of the Enemy Name Text color."] = "적 이름표의 이름 텍스트 색상을 '적 이름 텍스트' 색상 대신 대상과의 관계(적대적 또는 중립적)에 맞춰 변경합니다."
 
 --오라/강화 효과 알림
-L["Pick which content the class-special reminders (poisons/rites/imbues/shields) appear in.\nRested areas (cities and inns) always stay hidden."] = "직업 전용 알림(독/의식/무기 부여/보호막)을 표시할 콘텐츠를 선택합니다. 휴식 지역(도시 및 여관)에서는 항상 숨겨집니다."
+L["Pick which content these reminders appear in.\nRested areas (cities and inns) always stay hidden."] = "이 알림을 표시할 콘텐츠를 선택합니다.\n휴식 지역(도시 및 여관)에서는 항상 숨겨집니다."
 
 --2026-09-08 추가 및 신규
 
@@ -9892,7 +9895,7 @@ L["Adds the Blizzard shield glow line where the shield meets current health."] =
 L["Art used for the glow line and the overshield edge."] = "반짝임 선과 초과 보호막 테두리에 사용할 이미지입니다."
 L["Mana keeps the bar on Mana in Bear and Cat Form. Mana + Form Power also shows your Energy or Rage in a second bar."] = "곰 및 표범 변신 상태에서도 바에 마나를 유지합니다. '마나 + 폼 자원'은 두 번째 바로 기력이나 분노도 함께 표시합니다."
 L["Astral Power (Except Cat & Bear)"] = "천공의 힘 (표범 및 곰 제외)"
-L["The first choice follows your form, with Energy in Cat Form and Rage in Bear Form. Mana stays on Mana in every form, and Astral Power (Except Cat & Bear) shows Astral Power in every form but those two."] = "첫 번째 옵션은 변신 형태를 따릅니다(표범 형태에서는 기력, 곰 형태에서는 분노). '마나'는 모든 형태에서 마나를 유지하며, '천공의 힘 (표범 및 곰 제외)'은 이 두 형태를 제외한 모든 형태에서 천공의 힘을 표시합니다."
+L["The first choice follows your form, with Energy in Cat Form and Rage in Bear Form. Mana stays on Mana in every form, and Astral Power shows Astral Power in every form except Cat and Bear Form."] = "첫 번째 옵션은 변신 형태를 따릅니다(표범 형태에서는 기력, 곰 형태에서는 분노). '마나'는 모든 형태에서 마나를 유지하며, '천공의 힘'은 표범 형태와 곰 형태를 제외한 모든 형태에서 천공의 힘을 표시합니다."
 L["The first choice follows your form: Energy in Cat Form, Rage in Bear Form and Mana in the others. The other choices keep their power in every form."] = "첫 번째 옵션은 변신 형태를 따릅니다(표범 형태에서는 기력, 곰 형태에서는 분노, 그 외 형태에서는 마나). 나머지 옵션은 모든 형태에서 해당 자원을 유지합니다."
 L["Requires Power Type: Mana + Form Power."] = "자원 유형 설정이 '마나 + 폼 자원'이어야 합니다."
 L["Form Power Bar"] = "폼 자원 바"

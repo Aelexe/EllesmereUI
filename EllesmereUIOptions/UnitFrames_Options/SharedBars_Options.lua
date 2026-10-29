@@ -2473,10 +2473,11 @@ function ns.UFO_BuildPowerBarSection(parent, y, ctx)
         -- For Shadow Priest the alt is "no override" (nil) so UnitPowerType returns Insanity.
         local SPEC_POWER_ALTS = {
             DRUID  = {
-                [1] = { "Match Form",   "Mana",     0, astral = "Astral Power (Except Cat & Bear)" },   -- Balance
-                [2] = { "Energy",       "Mana",     0 },   -- Feral
-                [3] = { "Rage",         "Mana",     0 },   -- Guardian
-                tip = "The first choice follows your form, with Energy in Cat Form and Rage in Bear Form. Mana stays on Mana in every form, and Astral Power (Except Cat & Bear) shows Astral Power in every form but those two.",
+                [1] = { "Match Form",   "Mana",     0, astral = "Astral Power" },   -- Balance
+                [2] = { "Match Form",   "Mana",     0 },   -- Feral
+                [3] = { "Match Form",   "Mana",     0 },   -- Guardian
+                [4] = { "Match Form",   "Mana",     0 },   -- Restoration
+                tip = "The first choice follows your form, with Energy in Cat Form and Rage in Bear Form. Mana stays on Mana in every form, and Astral Power shows Astral Power in every form except Cat and Bear Form.",
             },
             PRIEST = {
                 [3] = { "Mana",         "Insanity", nil },  -- Shadow (default is our Mana override)

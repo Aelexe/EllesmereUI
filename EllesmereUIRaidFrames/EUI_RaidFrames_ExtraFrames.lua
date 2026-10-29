@@ -111,7 +111,7 @@ XF.FreeAnchor = function(c, set)
     if not r then return false end
     local grow, wrap, horizontal = XF.GrowInfo(set, db and db.profile)
     local corner, x, y = FB.CornerPin(horizontal and grow or wrap, horizontal and wrap or grow, r)
-    FB.Pin(c, corner, UIParent, "CENTER", x, y)
+    FB.FreePin(c, corner, x, y)
     return true
 end
 
@@ -168,7 +168,8 @@ XF.Pitch = function(set, s)
     if set and set.position ~= "free" and ns.RF_CompactOn(db.profile, false) then
         return ns.RF_OnePixel(false)
     end
-    return s.cellSpacing or 2
+    -- Same grid as FB.FreePin: the extra container's own scale.
+    return EllesmereUI.PP.SnapForES(s.cellSpacing or 2, XF.container:GetEffectiveScale())
 end
 
 -- Geometry only: container size, button stacking, per-button size (Extra
