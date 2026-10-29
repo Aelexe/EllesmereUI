@@ -3709,6 +3709,45 @@ local function InitBuffBarsPage(PP, DB, Refresh, FONT_PATH, GetCDMOptOutline, Ga
                 },
             })
         end
+        -- Cog on Name Text: custom display name override
+        do
+            local rgn = nameRow._leftRegion
+            EllesmereUI.BuildInlineCog(rgn, {
+                title = "Custom Name Text",
+                icon = "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-edit.png",
+                tip = "Custom display name",
+                disabled = function()
+                    local bd = SelectedTBB()
+                    if bd and bd.verticalOrientation then return true end
+                    local pos = bd and bd.namePosition
+                    if not pos then pos = (bd and bd.showName ~= false) and "left" or "none" end
+                    return pos == "none"
+                end,
+                disabledTooltip = function()
+                    local bd = SelectedTBB()
+                    if bd and bd.verticalOrientation then return "Horizontal Orientation (name text is not shown on vertical bars)" end
+                    return "This option requires a Name Text position other than None"
+                end,
+                rows = {
+                    { type = "input", label = "Custom Name", inputWidth = 120,
+                      get = function()
+                          local bd = SelectedTBB()
+                          return bd and bd.customName or ""
+                      end,
+                      set = function(text)
+                          local bd = SelectedTBB(); if not bd then return end
+                          bd.customName = (text ~= "" and text or nil)
+                          RefreshTBB()
+                      end },
+                    { type = "button", label = "Reset to Default",
+                      action = function()
+                          local bd = SelectedTBB(); if not bd then return end
+                          bd.customName = nil
+                          RefreshTBB()
+                      end },
+                },
+            })
+        end
         -- Sync icon on Name Text
         do
             local rgn = nameRow._leftRegion

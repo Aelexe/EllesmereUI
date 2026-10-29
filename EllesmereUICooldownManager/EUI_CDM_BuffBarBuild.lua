@@ -142,7 +142,7 @@ function ns.BuildTrackedBuffBars()
             -- Name text
             local namePos2 = cfg.namePosition or ((cfg.showName ~= false) and "left" or "none")
             if namePos2 ~= "none" and bar._nameText then
-                local displayName = cfg.name
+                local displayName = (cfg.customName and cfg.customName ~= "") and cfg.customName or cfg.name
                 -- Preset bars take the live label the same way the icon does above:
                 -- the copy saved at pick time can name the other faction's lust.
                 if cfg.popularKey then
