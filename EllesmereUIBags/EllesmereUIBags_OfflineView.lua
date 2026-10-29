@@ -223,6 +223,7 @@ end
 local Place  -- below
 -- closing a window goes back to this character
 EUI_Bags:HookScript("OnHide", function()
+    if EUI_Bags:IsShown() then return end
     bagsView.key = nil
     if bagsView.mode then Place(bagsView, nil) end
 end)
@@ -401,7 +402,8 @@ end
 -------------------------------------------------------------------------------
 --  content
 -------------------------------------------------------------------------------
--- the containers behind the view, and when they were saved
+-- the containers behind the view, when they were saved, and the saved list
+-- they come from (its revision says when they changed)
 local function Containers(v)
     local list, saved
     local kind, i = TabKind(v)
@@ -411,15 +413,34 @@ local function Containers(v)
     else
         local c = Offline.Char(ShownKey(v))
         if not c then return nil end
-        if v.mode == "bags" then return c.bags, c.bagsTime end
+        if v.mode == "bags" then return c.bags, c.bagsTime, c.bags end
         list, saved = c.bank, c.bankTime
     end
-    -- one tab picked in the bank window's sidebar
-    if i and v.mode == "bank" and type(list) == "table" then
-        if not list[i] then return list, saved end
-        return { list[i] }, saved
+    -- one tab picked in the bank window's sidebar: the view keeps one wrapper so the memo holds
+    if i and v.mode == "bank" and type(list) == "table" and list[i] then
+        local one = v.one or {}
+        v.one, one[1] = one, list[i]
+        return one, saved, list
     end
-    return list, saved
+    return list, saved, list
+end
+
+-- category edits bump this, so the memo and a paint know the grouping moved
+local catGen = 0
+do
+    local CM = _G.EUI_CategoryManager
+    for _, m in ipairs({ "InitCategories", "SaveState", "RenameCategory", "ReorderCategory", "GroupCategories",
+        "AddToGroup", "UngroupCategory", "DisbandGroup", "RenameGroup", "AddCustomCategory", "RemoveCustomCategory",
+        "AssignItem", "UnassignItem", "ToggleJunk", "OnJunkChanged", "OnEquipmentSetsChanged" }) do
+        if CM and type(CM[m]) == "function" then hooksecurefunc(CM, m, function() catGen = catGen + 1 end) end
+    end
+end
+
+-- the disabled categories as one string, for the memo and the signature
+local function DisabledKey()
+    local dis = ""
+    for k in pairs(BP().bagDisabledCategories or _emptyP) do dis = dis .. k .. "," end
+    return dis
 end
 
 local waiting = false  -- item data asked for; one repaint when it lands
@@ -441,14 +462,16 @@ local function Info(s, id)
     return name, q, icon
 end
 
--- every saved item as a display entry with its bags category; one pass per
--- list, store rev and frame, so the sidebar counts and the paint share it.
--- bags: it's a bags list, so the 6th container is the reagent bag
+-- every saved item as a display entry with its bags category; kept until the
+-- list, its revision, the categories or the disabled set change, so the
+-- sidebar counts and repaints share it. a pass still waiting on item data
+-- runs again. bags: it's a bags list, so the 6th container is the reagent bag.
+-- src: the saved list it came from (a one-tab view wraps one of its tabs)
 local pass = {}
-local function Classified(list, bags)
-    local now = GetTime()
-    if pass.list == list and pass.rev == Offline.Rev() and pass.time == now then
-        if pass.waiting then waiting = true end
+local function Classified(list, bags, src)
+    local rev, dis = Offline.ListRev(src or list), DisabledKey()
+    if pass.list == list and pass.rev == rev and pass.cat == catGen and pass.dis == dis
+        and pass.bags == bags and not pass.waiting then
         return pass.items, pass.used, pass.total
     end
     local items, used, total, wait = {}, 0, 0, false
@@ -492,14 +515,14 @@ local function Classified(list, bags)
         end
     end
     if wait then waiting = true end
-    pass.list, pass.rev, pass.time, pass.waiting = list, Offline.Rev(), now, wait
+    pass.list, pass.rev, pass.cat, pass.dis, pass.bags, pass.waiting = list, rev, catGen, dis, bags, wait
     pass.items, pass.used, pass.total = items, used, total
     return items, used, total
 end
 
 -- the classified items, cut down to the search and the filter's categories
-local function Collect(list, bags, query, filter)
-    local all, used, total = Classified(list, bags)
+local function Collect(list, bags, query, filter, src)
+    local all, used, total = Classified(list, bags, src)
     if query == "" and not filter then return all, used, total end
     local items = {}
     for _, it in ipairs(all) do
@@ -614,27 +637,17 @@ local function Gold(v)
     return e and e.money
 end
 
--- category edits bump this, so a paint knows the grouping moved
-local catGen = 0
-do
-    local CM = _G.EUI_CategoryManager
-    for _, m in ipairs({ "InitCategories", "SaveState", "RenameCategory", "ReorderCategory", "GroupCategories",
-        "AddToGroup", "UngroupCategory", "DisbandGroup", "RenameGroup", "AddCustomCategory", "RemoveCustomCategory",
-        "AssignItem", "UnassignItem", "ToggleJunk", "OnJunkChanged", "OnEquipmentSetsChanged" }) do
-        if CM and type(CM[m]) == "function" then hooksecurefunc(CM, m, function() catGen = catGen + 1 end) end
-    end
-end
-
--- everything a paint draws from; the same signature twice means nothing moved
-local function Signature(v, list, query, gold, age)
+-- everything the grid draws from; the same signature twice means nothing moved.
+-- gold and the saved time are painted on their own, outside it
+local function Signature(v, list, src, query)
     local p = BP()
     local sel, group = ns.GetSelection()
-    local dis = ""
-    for k in pairs(p.bagDisabledCategories or _emptyP) do dis = dis .. k .. "," end
     local r, g, b = 0, 0, 0
     if EUI.GetAccentColor then r, g, b = EUI.GetAccentColor() end
-    return strjoin("|", tostring(v.mode), tostring(list), Offline.Rev(), query, v.viewTab, tostring(sel),
-        tostring(group), math.floor(v.panel:GetWidth() + 0.5), SLOT_SIZE, SPACING, catGen, GetFont(), tostring(gold), tostring(age),
+    local dis = DisabledKey()
+    return strjoin("|", tostring(v.mode), tostring(list), list and list[1] and tostring(list[1]) or "",
+        Offline.ListRev(src), query, v.viewTab, tostring(sel),
+        tostring(group), math.floor(v.panel:GetWidth() + 0.5), SLOT_SIZE, SPACING, catGen, GetFont(),
         tostring(p.bagItemIconZoom), tostring(p.bagCountFontSize), tostring(p.itemlevelFontSize),
         tostring(p.showItemlevelInBags), tostring(p.bagQualityBorder), tostring(p.bagCatTitleSize),
         tostring(p.bankSidebarCollapsed), tostring(p.bankHideTabsInSidebar), tostring(p.bankCategorySidebar),
@@ -656,9 +669,12 @@ Paint = function(v, force)
     if not (v.panel and v.panel:IsShown()) then return end
     local query = Query()
     local filter = Filter(v)
-    local list, saved = Containers(v)
-    local gold, age = Gold(v), Age(saved)
-    local sig = Signature(v, list, query, gold, age)
+    local list, saved, src = Containers(v)
+    -- saved time and gold on the bar, every time (cheap; they change on every loot)
+    local age = Age(saved)
+    v.info:SetText(age and EllesmereUI.Lf("Saved %1$s", age) or "")
+    PaintGold(v, Gold(v))
+    local sig = Signature(v, list, src, query)
     if not force and sig == v.sig then
         PaintCount(v)
         return
@@ -673,7 +689,7 @@ Paint = function(v, force)
     local titleSize = BP().bagCatTitleSize or 11
 
     waiting = false
-    local items, used, total = Collect(list, v.mode == "bags", query, filter)
+    local items, used, total = Collect(list, v.mode == "bags", query, filter, src)
     local y, shown, nh = -6, 0, 0
     if list then
         local groups = Group(items)
@@ -728,10 +744,7 @@ Paint = function(v, force)
     v.empty:SetText(empty or "")
     v.empty:SetShown(empty ~= nil)
 
-    -- saved time and gold on the bar; slots in the window header
-    v.info:SetText(age and EllesmereUI.Lf("Saved %1$s", age) or "")
-    PaintGold(v, gold)
-
+    -- slots in the window header
     local text = ""
     if list and filter then
         text = EllesmereUI.Lf("%d Items", shown)
@@ -744,21 +757,25 @@ Paint = function(v, force)
 end
 
 -- item data landing, or the store changing under an open view
-local function Soon(v)
+-- force: item data landed (the signature can't see that)
+local function Soon(v, force)
+    if force then v.force = true end
     if v.repaint then return end
     v.repaint = true
     C_Timer.After(0.2, function()
         v.repaint = false
+        local f = v.force
+        v.force = nil
         if not (v.panel and v.panel:IsVisible()) then return end
         -- an alt's sidebar counts come from these same items: just the sidebar, not a full refresh
         if v == bagsView and AltKey(v) and I.BuildSidebarButtons then I.BuildSidebarButtons(ns.OfflineCounts()) end
-        Paint(v, true)
+        Paint(v, f)
     end)
 end
 local ev = CreateFrame("Frame")
 ev:SetScript("OnEvent", function()
     if not waiting then return end
-    for _, v in ipairs(views) do if v.panel and v.panel:IsVisible() then Soon(v) end end
+    for _, v in ipairs(views) do if v.panel and v.panel:IsVisible() then Soon(v, true) end end
 end)
 local function SyncEvents()
     for _, v in ipairs(views) do

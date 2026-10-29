@@ -60,6 +60,15 @@ Offline.ItemID = ItemID
 local rev = 0          -- goes up on every write so the tooltip index knows to rebuild
 local listeners = {}
 local index, indexRev  -- tooltip index, below
+-- per saved list: goes up only when that list changes, so a view of it can
+-- tell its own list apart from every other save
+local listRev = setmetatable({}, { __mode = "k" })
+local listGen = 0
+local function Bump(list)
+    listGen = listGen + 1
+    listRev[list] = listGen
+end
+function Offline.ListRev(list) return list and listRev[list] or 0 end
 
 -- saves from before item strings kept whole colored links
 local function Upgrade(list)
@@ -122,6 +131,11 @@ end
 
 function Offline.Forget(key)
     if not Offline.CanForget(key) then return end
+    local c = Offline.Store().chars[key]
+    if type(c) == "table" then
+        if type(c.bags) == "table" then Bump(c.bags) end
+        if type(c.bank) == "table" then Bump(c.bank) end
+    end
     Offline.Store().chars[key] = nil
     Changed("forget")
 end
@@ -235,6 +249,7 @@ local function SaveList(list, ids, pos, field, owner, meta)
             end
         end
     end
+    if changed then Bump(list) end
     return changed
 end
 
@@ -352,6 +367,8 @@ end
 function Offline.Wipe()
     _G.EllesmereUIBagsInventoryDB = nil
     index = nil
+    wipe(listRev)
+    listGen = listGen + 1
     Changed("forget")
     -- this character saves again right away
     MarkAll(BAGS)

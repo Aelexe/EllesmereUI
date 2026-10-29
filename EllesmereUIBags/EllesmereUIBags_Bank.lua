@@ -3229,8 +3229,7 @@ function BuildBankSidebar()
     -- bank and warbank views and the buy entries go last (an alt's bank draws
     -- the same way). off: the usual layout
     local nested = ns.Offline and ns.Offline.Enabled()
-    for _, k in ipairs(nested and { "_bankTabDivider", "_warbandDivider", "_warbandTabDivider" }
-        or { "_warbandViewDivider", "_buyDivider" }) do
+    for _, k in ipairs({ "_bankTabDivider", "_warbandDivider", "_warbandTabDivider", "_warbandViewDivider", "_buyDivider" }) do
         if sidebarChild[k] then sidebarChild[k]:Hide() end
     end
 
