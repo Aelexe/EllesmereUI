@@ -472,7 +472,10 @@ end
 local passes = setmetatable({}, { __mode = "k" })
 local function Classified(list, bags, src)
     local rev, dis = Offline.ListRev(src or list), DisabledKey()
-    local pass = list and passes[list]
+    -- a one-tab view reuses its wrapper for every tab, so it's keyed on the tab itself
+    local key = list
+    if src and src ~= list then key = list[1] end
+    local pass = key and passes[key]
     if pass and pass.rev == rev and pass.cat == catGen and pass.dis == dis
         and pass.bags == bags and not pass.waiting then
         return pass.items, pass.used, pass.total
@@ -518,8 +521,8 @@ local function Classified(list, bags, src)
         end
     end
     if wait then waiting = true end
-    if list then
-        passes[list] = { rev = rev, cat = catGen, dis = dis, bags = bags, waiting = wait,
+    if key then
+        passes[key] = { rev = rev, cat = catGen, dis = dis, bags = bags, waiting = wait,
             items = items, used = used, total = total }
     end
     return items, used, total
