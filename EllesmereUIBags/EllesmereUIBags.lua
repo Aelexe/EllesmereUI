@@ -437,6 +437,6 @@ function ns.ApplySlotMetrics()
     if (size == SLOT_SIZE and gap == SPACING) or InCombatLockdown() then return end
     SLOT_SIZE, SPACING = size, gap
     ns.SLOT_SIZE, ns.SPACING = size, gap
-    ns._bagsInternals.SetSlotMetrics({ size, gap })
     for f in pairs(slotFrames) do f:SetSize(size, size) end
+    ns._bagsInternals.SetSlotMetrics({ size, gap })
 end

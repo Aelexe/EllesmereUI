@@ -191,8 +191,6 @@ initFrame:SetScript("OnEvent", function(self)
                 relayoutQueued = true
                 C_Timer.After(0, function()
                     relayoutQueued = false
-                    local bags = _G.EUI_Bags
-                    if bags then bags._compactCols, bags._compactW = nil, nil end
                     ResetAndRefreshBagLayout()
                     local bank = _G.EUI_BankFrame
                     if bank and bank:IsVisible() and bank.RefreshBank then bank:RefreshBank() end

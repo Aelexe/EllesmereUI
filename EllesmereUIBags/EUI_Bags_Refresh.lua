@@ -438,9 +438,15 @@ local _bagListGripCfg = setmetatable({
         if EUI_Bags._updateThumb then EUI_Bags._updateThumb() end
     end,
 }, { __index = _bagGripCfg })
+-- a new slot size: grow-only widths start over, and the detached reagent
+-- window and bag bar lay out again (the main refresh does the rest)
 ns.OnSlotMetrics(function(m)
     _bagGripCfg.step = m[1] + m[2]
     rawset(_bagListGripCfg, "relayoutStep", m[1] + m[2])
+    EUI_Bags._compactCols, EUI_Bags._compactW = nil, nil
+    EUI_Bags._asCols, EUI_Bags._asMaxGridW, EUI_Bags._asMaxH = nil, nil, nil
+    if EUI_BagsReagent:IsShown() and EUI_BagsReagent.RefreshInventory then EUI_BagsReagent:RefreshInventory() end
+    if EUI_BagsWindow:IsShown() and EUI_BagsWindow.RefreshBags then EUI_BagsWindow:RefreshBags() end
 end)
 
 local function FinishRefresh(curY, gridContentW, sidebarW, totalCount, numEmpty, spItems, spEmpty)
@@ -823,8 +829,10 @@ function EUI_Bags:RefreshInventory()
     -- (running max in _asCols, reset on close); HEIGHT follows rendered content up to the screen cap. Decided BEFORE GetColumns() so the grid renders at this count.
     if EUI_Bags.AutoSizeOn() then
         local baseCols = BP().bagColumns or 12
-        local BASE_ROWS = 15  -- rows visible at the base (FIXED_H) height
-        local HDR = 0.74      -- section-header height in slot-row units (~28/38)
+        -- tuned at the default 38 px pitch, scaled to the current one
+        local pitch = SLOT_SIZE + SPACING
+        local BASE_ROWS = 15 * 38 / pitch  -- rows visible at the base (FIXED_H) height
+        local HDR = 0.74 * 38 / pitch      -- section-header height in slot-row units (~28/38)
         -- Slot count (n) + section-header count (S) for the active tab. Headers add HEIGHT
         -- but not WIDTH, so they MUST fold into the estimate or a header-heavy tab (All Items with many categories) grows taller than wide.
         local n, S

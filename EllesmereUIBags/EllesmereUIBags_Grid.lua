@@ -308,12 +308,12 @@ local function RenderButton(btn, data, _, col, row, startX, currentY, _, interac
                 if not btn.SetNameText then
                     local overlay = btn._textOverlay or btn
                     btn.SetNameText = overlay:CreateFontString(nil, "OVERLAY", nil, 7)
-                    btn.SetNameText:SetPoint("BOTTOM", btn, "BOTTOM", 0, 2)
+                    btn.SetNameText:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 2, 2)
+                    btn.SetNameText:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2, 2)
                     btn.SetNameText:SetTextColor(1, 1, 1, 1)
                     btn.SetNameText:SetJustifyH("CENTER")
                     btn.SetNameText:SetWordWrap(false)
                     btn.SetNameText:SetMaxLines(1)
-                    btn.SetNameText:SetWidth(SLOT_SIZE - 4)
                     btn.SetNameText:SetFont(GetFont(), BP().bagSetNameFontSize or 9, (EllesmereUI.SlugFlag("OUTLINE, SLUG")) or "OUTLINE, SLUG")
                 end
                 btn.SetNameText:SetText(data._setName)

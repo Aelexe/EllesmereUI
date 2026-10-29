@@ -2088,16 +2088,25 @@ local _bankListGripCfg = setmetatable({
         UpdateThumb()
     end,
 }, { __index = _bankGripCfg })
+-- a new slot size: grow-only widths start over, header lines take the new
+-- inset and the bag bar lays out again
 ns.OnSlotMetrics(function(m)
     _bankGripCfg.step = m[1] + m[2]
     rawset(_bankListGripCfg, "relayoutStep", m[1] + m[2])
+    EUI_Bank._compactCols, EUI_Bank._compactW = nil, nil
+    for _, f in pairs(_bankHeaders) do
+        f._line:ClearAllPoints()
+        f._line:SetPoint("LEFT", f._label, "RIGHT", 6, 0)
+        f._line:SetPoint("RIGHT", f, "RIGHT", -m[2], 0)
+    end
+    if RefreshBankBags then RefreshBankBags() end
 end)
 
 local BuildBankSidebar  -- defined further down
 function EUI_Bank:RefreshBank()
     if not EUI_Bank:IsVisible() then return end
-    ns.ApplySlotMetrics()
     NotifyBankTypeForTSM()
+    ns.ApplySlotMetrics()
 
     -- Re-discover tabs if empty (data may not be ready on the same frame as
     -- BANKFRAME_OPENED; BAG_UPDATE fires shortly after with real slot counts).
