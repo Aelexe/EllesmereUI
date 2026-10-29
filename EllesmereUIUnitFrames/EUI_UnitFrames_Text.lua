@@ -453,7 +453,7 @@ local PLAYER_POWER_DEFAULT = {
     MONK   = { [2] = 0 },   -- Mistweaver: default to Mana
 }
 local PLAYER_POWER_ALT = {
-    DRUID  = { [1] = 0, [2] = 0, [3] = 0 },  -- Balance/Feral/Guardian -> Mana
+    DRUID  = { [1] = 0, [2] = 0, [3] = 0, [4] = 0 },  -- All druid specs -> Mana
     PRIEST = { [3] = nil },                     -- Shadow alt -> Insanity (UnitPowerType)
     SHAMAN = { [1] = 0 },                       -- Elemental -> Mana
 }
@@ -487,7 +487,7 @@ function EllesmereUI.GetPlayerPowerOverride()
     local ov = db.profile.player and db.profile.player.powerTypeOverride
     local choice = sid and ov and ov[sid]
     if choice == "astral" then
-        -- Balance "Astral Power (Except Cat & Bear)", saved only under its spec
+        -- Balance "Astral Power", saved only under its spec
         -- ID: Cat and Bear Form (form IDs 1 and 5) keep their own power, every
         -- other form shows Astral Power.
         local f = GetShapeshiftFormID()
@@ -885,16 +885,6 @@ do
     P.name        = TagFns.name
     P.tgtcol      = TagFns.tgtcol
     P.tgtname     = TagFns.tgtname
-    -- Name Format shapes. ForeverShortName returns a secret name unchanged.
-    local function Shaped(piece, mode)
-        return function(unit)
-            return EllesmereUI.ForeverShortName(piece(unit), mode)
-        end
-    end
-    for _, mode in ipairs({ "first", "last", "abbr", "10", "15", "4" }) do
-        P["name" .. mode] = Shaped(P.name, mode)
-        P["tgt" .. mode] = Shaped(P.tgtname, mode)
-    end
 
     -- String-compiled tag methods get real equivalents (same logic, same
     -- _EUI_ globals; the compiled strings stay registered only while the tag
@@ -1058,9 +1048,17 @@ do
         [P.absorb] = "abs", [P.absorbshort] = "abs",
         [P.healabsorb] = "habs", [P.healabsorbshort] = "habs",
         [P.name] = "id", [P.level] = "id", [P.levelcol] = "id", [P.levelcolall] = "id",
-        [P.namefirst] = "id", [P.namelast] = "id", [P.nameabbr] = "id",
-        [P["name10"]] = "id", [P["name15"]] = "id", [P["name4"]] = "id",
     }
+    local function Shaped(piece, mode)
+        return function(unit)
+            return EllesmereUI.ForeverShortName(piece(unit), mode)
+        end
+    end
+    for _, mode in ipairs({ "first", "last", "abbr", "10", "15", "4" }) do
+        P["name" .. mode] = Shaped(P.name, mode)
+        P["tgt" .. mode] = Shaped(P.tgtname, mode)
+        PIECE_READS[P["name" .. mode]] = "id"
+    end
 
     -- Custom content: the slot's own format string (<prefix>CustomFormat),
     -- parsed by EllesmereUI.TextTags against this binding of the unit schema.

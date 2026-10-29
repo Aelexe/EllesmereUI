@@ -35,10 +35,10 @@ if EllesmereUI.IS_FOREVER then
 end
 
 -- Settings-cog rows of a text slot that can show a name. Name Format offers
--- the full name, its first or last word, initials, or a character cap.
--- prefix is the slot's key prefix ("leftText", "btbLeft"): content at
--- <prefix>Content, format at <prefix>NameFormat. get(key, default) /
--- set(key, v) are the page's accessors. On ns for the same upvalue cap.
+-- the full name, one word, initials, or a character cap. prefix is the slot's
+-- key prefix ("leftText", "btbLeft"): content at <prefix>Content, format at
+-- <prefix>NameFormat. get(key, default) / set(key, v) are the page's accessors.
+-- On ns for the same upvalue cap.
 if EllesmereUI.NAME_FORMAT_VALUES then
     local HAS_NAME = { name = true, levelname = true, namelevel = true, nametotarget = true, targetname = true }
     local FORMATS, FORMAT_ORDER = EllesmereUI.NAME_FORMAT_VALUES, EllesmereUI.NAME_FORMAT_ORDER
@@ -868,7 +868,7 @@ local function HideExhaustionRow(getS, onChanged)
         tooltip = "Hides Sated, Exhaustion, Temporal Displacement and the other Bloodlust lockout debuffs.",
         get = function() return getS().debuffHideExhaustion ~= false end,
         set = function(v)
-            getS().debuffHideExhaustion = (not v) and false or nil
+            if v then getS().debuffHideExhaustion = nil else getS().debuffHideExhaustion = false end
             onChanged()
         end }
 end
