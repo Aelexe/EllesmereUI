@@ -177,7 +177,7 @@ local function InitBuffBarsPage(PP, DB, Refresh, FONT_PATH, GetCDMOptOutline, Ga
         local unassigned = (not cfg.spellID or cfg.spellID == 0) and not cfg.glowBased
         -- Name (same resolution as the live build)
         if wrap._nameText and wrap._nameText:IsShown() then
-            local displayName = cfg.name
+            local displayName = (cfg.customName and cfg.customName ~= "") and cfg.customName or cfg.name
             if (not displayName or displayName == "" or displayName == "New Bar")
                and cfg.spellID and cfg.spellID > 0 then
                 local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(cfg.spellID)
@@ -3729,7 +3729,7 @@ local function InitBuffBarsPage(PP, DB, Refresh, FONT_PATH, GetCDMOptOutline, Ga
                     return "This option requires a Name Text position other than None"
                 end,
                 rows = {
-                    { type = "input", label = "Custom Name", inputWidth = 120,
+                    { type = "input", label = "Custom Name", inputWidth = 120, commitOnBlur = true,
                       get = function()
                           local bd = SelectedTBB()
                           return bd and bd.customName or ""
