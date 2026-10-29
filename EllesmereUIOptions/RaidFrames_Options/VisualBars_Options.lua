@@ -51,6 +51,7 @@ local function BuildVisualBars(parent, y, W, onSection, EYE)
     local optState, PP, ReloadAndUpdate = env.optState, env.PP, env.ReloadAndUpdate
     local SGet, SGetPx, SSet, SVal = env.SGet, env.SGetPx, env.SSet, env.SVal
     local SWrite = env.SWrite
+    local TexBgRowCfg = env.TexBgRowCfg
     local _, h
     local row
     local _secY  -- section start tracker
@@ -273,6 +274,7 @@ local function BuildVisualBars(parent, y, W, onSection, EYE)
                   tooltip="The bar fills with missing health, growing as the unit takes damage.",
                   get=function() return SVal("healthInvertFill", false) end,
                   set=function(v) SSet("healthInvertFill", v) end }),
+                TexBgRowCfg(SVal, SSet),
             },
         })
     end
@@ -1454,7 +1456,7 @@ local function BuildVisualBars(parent, y, W, onSection, EYE)
     y = ns.RFO_BuildTextDisplay(W, parent, y, { page = EllesmereUI._buildingPage, party = optState._partyCtx })
     -- WoW Forever's Name Format also shapes the Top Name Bar, so it has a row of
     -- its own, not a place on the Name tile.
-    if EllesmereUI.IS_FOREVER then
+    if EllesmereUI.NAME_FORMAT_VALUES then
         _, h = W:DualRow(parent, y,
             { type="dropdown", text="Name Format",
               values=EllesmereUI.NAME_FORMAT_VALUES, order=EllesmereUI.NAME_FORMAT_ORDER,

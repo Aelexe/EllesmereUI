@@ -348,6 +348,13 @@ local function BuildGeneralPage(pageName, parent, yOffset)
                     DB().friendlyNameFormat = v
                     ns.NP_SyncFriendlyNameFormat()
                 end))
+        elseif EllesmereUI.NameFormatCogRow then
+            table.insert(cog.rows, 1, EllesmereUI.NameFormatCogRow(
+                function() return DBVal("friendlyNameFormat") end,
+                function(v)
+                    DB().friendlyNameFormat = v
+                    if ns.RefreshAllSettings then ns.RefreshAllSettings() end
+                end))
         end
         EllesmereUI.BuildInlineCog(subtitleRow._leftRegion, cog)
     end
@@ -392,6 +399,12 @@ local function BuildGeneralPage(pageName, parent, yOffset)
             rawTooltip = true,
             title = "Friendly NPC Settings",
             rows = {
+                EllesmereUI.NameFormatCogRow(
+                    function() return DBVal("friendlyNPCNameFormat") end,
+                    function(v)
+                        DB().friendlyNPCNameFormat = v
+                        if ns.RefreshAllNPCOverlays then ns.RefreshAllNPCOverlays() end
+                    end),
                 { type = "toggle", label = "Show NPC Titles",
                   get = function() return DBVal("showNPCTitles") ~= false end,
                   set = function(v)

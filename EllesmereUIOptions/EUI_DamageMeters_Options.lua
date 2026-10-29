@@ -1283,7 +1283,7 @@ initFrame:SetScript("OnEvent", function(self)
                       if ns.ApplyBarTextOffsets then ns.ApplyBarTextOffsets() end
                   end },
             }
-            if EllesmereUI.IS_FOREVER then
+            if EllesmereUI.NameFormatCogRow then
                 local nameFormat = EllesmereUI.NameFormatCogRow(
                     function() return Cfg("nameFormat") end,
                     function(v)

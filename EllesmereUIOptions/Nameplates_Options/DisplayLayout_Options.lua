@@ -2918,11 +2918,11 @@ local function BuildDisplayLayout(parent, y, ctx)
             if slotEl == "targetOfTarget" or slotEl == "level" or slotEl == "custom" then
                 cogOpts.toggleLabel, cogOpts.toggleGet, cogOpts.toggleSet = nil, nil, nil
             end
-            -- WoW Forever: the name's format, while this slot shows a name or the
-            -- Target of Target name. First and Last is stored as nil (the
-            -- runtime's full-name path).
+            -- Name Format, while this slot shows a name, the Target of Target
+            -- name, or a custom template that reads one. Full name is stored as
+            -- nil (the runtime's unchanged path).
             local parsed = slotEl == "custom" and ns.NP_CustomParse(slotKey, DB())
-            if EllesmereUI.IS_FOREVER and (ns.IsNameElement(slotEl) or slotEl == "targetOfTarget"
+            if EllesmereUI.NAME_FORMAT_ORDER and (ns.IsNameElement(slotEl) or slotEl == "targetOfTarget"
                 or (parsed and (parsed.has.name or parsed.has.target))) then
                 local nfKey = slotKey .. "NameFormat"
                 cogOpts.dropdown2Label = "Name Format"

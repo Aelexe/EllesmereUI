@@ -182,6 +182,122 @@ do
     end
 end
 
+-- Textured Background (Health Bar Fill cog; off by default): the bar texture on the
+-- bar backgrounds, tinted by the colour each is painted. A tinted background's own
+-- SetColorTexture tints the texture, so every existing paint keeps it: paint these
+-- backgrounds only through SetColorTexture. The health background follows the fill
+-- edge, so there the texture is a fixed full-size layer on the health bar, shown
+-- while the fill is opaque, with the flat background under it painted clear.
+do
+    local SetColor  -- the stock SetColorTexture
+    local function PaintTinted(self, r, g, b, a) self:SetVertexColor(r, g, b, a) end
+    local function PaintLayer(self, r, g, b, a)
+        SetColor(self, r, g, b, 0)
+        self._rfTexBgLayer:SetVertexColor(r, g, b, a)
+    end
+    -- The background texture path in settings s (nil = flat); the previews share it.
+    function ns.RF_TexBgPath(s)
+        if not (s and s.textureBg) then return nil end
+        local key = s.healthBarTexture or "atrocity"
+        if key == "none" then return nil end
+        return ns.EllesmereUI.ResolveTexturePath(ns.healthBarTextures, key, nil)
+    end
+    -- Whether a health fill painted from s is opaque (dark: the Dark Mode Fill).
+    function ns.RF_TexBgOpaque(s, dark)
+        if dark then
+            local _, _, _, a = ns.EllesmereUI.GetDarkModeFill()
+            return a >= 1
+        end
+        return (s.healthBarOpacity or 100) >= 100
+    end
+    -- A background that never moves: swapped to the texture at path, tinted by its
+    -- paints (vertical: turned with a vertical bar); nil puts the flat colour back at
+    -- the next paint.
+    function ns.RF_TexBgTint(bg, path, vertical)
+        if path then
+            SetColor = SetColor or bg.SetColorTexture
+            if bg._rfTexBgPath ~= path then
+                bg:SetTexture(path)
+                bg._rfTexBgPath = path
+            end
+            if vertical then bg:SetTexCoord(1, 0, 0, 0, 1, 1, 0, 1) else bg:SetTexCoord(0, 1, 0, 1) end
+            bg.SetColorTexture = PaintTinted
+        elseif bg._rfTexBgPath then
+            bg._rfTexBgPath = nil
+            bg.SetColorTexture = nil
+            bg:SetVertexColor(1, 1, 1, 1)
+            bg:SetTexCoord(0, 1, 0, 1)
+        end
+    end
+    -- The health background's fixed layer (built once, turned as the fill is), shown
+    -- while path is set; the next paint of bg tints it.
+    function ns.RF_TexBgLayer(health, bg, path)
+        if path then
+            SetColor = SetColor or bg.SetColorTexture
+            local layer = bg._rfTexBgLayer
+            if not layer then
+                layer = health:CreateTexture(nil, "BACKGROUND", nil, 2)
+                layer:SetAllPoints(health)
+                bg._rfTexBgLayer = layer
+            end
+            if layer._rfTexBgPath ~= path then
+                layer:SetTexture(path)
+                layer._rfTexBgPath = path
+            end
+            if health:GetRotatesTexture() then
+                layer:SetTexCoord(1, 0, 0, 0, 1, 1, 0, 1)
+            else
+                layer:SetTexCoord(0, 1, 0, 1)
+            end
+            layer:Show()
+            bg.SetColorTexture = PaintLayer
+        elseif bg.SetColorTexture == PaintLayer then
+            bg.SetColorTexture = nil
+            bg._rfTexBgLayer:Hide()
+        end
+    end
+    -- Buttons with a health layer, re-checked when the colours change (a Dark Mode
+    -- Fill edit can cross 100 with no reload); the hook goes in on first use.
+    local watched
+    local function Recheck()
+        for button, health in pairs(watched) do
+            local d = GetFFD(button)
+            local s = d._isParty and ns._scaledPartyProxy
+                or (d._isExtra and ns._scaledExtraProxy) or ns._scaledProfile
+            local path = ns.RF_TexBgPath(s)
+            path = path and not d.kit and ns.RF_TexBgOpaque(s, s.healthColorMode == "dark") and path or nil
+            if (path ~= nil) ~= (d.bg.SetColorTexture == PaintLayer) then
+                ns.RF_TexBgLayer(health, d.bg, path)
+                d._bgSt, d._bgA = nil, nil
+                local u = button:GetAttribute("unit")
+                if u and UnitExists(u) then ns._ApplyHealthBg(d, health, s, u) end
+            end
+        end
+        if ns._PT_TexBgRecheck then ns._PT_TexBgRecheck() end
+    end
+    function ns.RF_TexBgWatch()
+        if watched then return watched end
+        watched = setmetatable({}, { __mode = "k" })
+        hooksecurefunc(ns.EllesmereUI, "ApplyColorsToOUF", Recheck)
+        return watched
+    end
+    -- The raid, party and Extra Frames buttons (ReanchorAbsorbToFill: built, and
+    -- every settings reload before both backgrounds repaint). s: the button's view.
+    function ns.RF_TexBgApply(button, d, health, s)
+        local path = ns.RF_TexBgPath(s)
+        if not (path or d._rfTexBg) then return end
+        d._rfTexBg = path and true or nil
+        local hp = path and not d.kit and ns.RF_TexBgOpaque(s, s.healthColorMode == "dark") and path or nil
+        if d.bg then ns.RF_TexBgLayer(health, d.bg, hp) end
+        if d.powerBg then ns.RF_TexBgTint(d.powerBg, path) end
+        if hp then
+            ns.RF_TexBgWatch()[button] = health
+        elseif watched then
+            watched[button] = nil
+        end
+    end
+end
+
 -- Dark mode colors come from the global per-profile palette via GetDarkModeFill()/GetDarkModeBg(),
 -- fetched live at each use so settings changes show on the next refresh. Opacity honored here
 -- (RF + UF); only Resource Bars keep their own alpha.
@@ -365,7 +481,7 @@ end
 -- WoW Forever Name Format (Text Display, nameFormat): the character name's
 -- first or last word; unset or "full" shows it whole. Nicknames are never
 -- shortened. Defined only on Forever, so elsewhere a name pays one nil test.
-if ns.EllesmereUI.IS_FOREVER then
+if ns.EllesmereUI.ForeverShortName then
     function ns.RF_FormatName(display, s)
         local mode = s and s.nameFormat
         if not mode or mode == "full" then return display end
@@ -779,6 +895,14 @@ do
         return ""
     end
 
+    local function Shaped(base, mode)
+        return function(unit, s, pv)
+            local name = base(unit, s, pv)
+            local short = EllesmereUI.ForeverShortName
+            if not short or name == nil or name == "" then return name end
+            return short(name, mode)
+        end
+    end
     local CATALOG = TextTags.Bind(TextTags.UNIT, {
         ["hp"] = Amount("hp"), ["hp:abr"] = Amount("hp:abr"), ["hp:max"] = Amount("hp:max"),
         ["hp:max:abr"] = Amount("hp:max:abr"), ["hp:pct"] = HealthPct,
@@ -788,7 +912,13 @@ do
         ["absorb:abr"] = Absorb("absorb:abr", UnitGetTotalAbsorbs),
         ["healabsorb"] = Absorb("healabsorb", UnitGetTotalHealAbsorbs),
         ["healabsorb:abr"] = Absorb("healabsorb:abr", UnitGetTotalHealAbsorbs),
-        ["name"] = Name, ["target"] = Target, ["group"] = Group,
+        ["name"] = Name, ["name:first"] = Shaped(Name, "first"), ["name:last"] = Shaped(Name, "last"),
+        ["name:abbr"] = Shaped(Name, "abbr"), ["name:10"] = Shaped(Name, "10"),
+        ["name:15"] = Shaped(Name, "15"), ["name:4"] = Shaped(Name, "4"),
+        ["target"] = Target, ["target:first"] = Shaped(Target, "first"), ["target:last"] = Shaped(Target, "last"),
+        ["target:abbr"] = Shaped(Target, "abbr"), ["target:10"] = Shaped(Target, "10"),
+        ["target:15"] = Shaped(Target, "15"), ["target:4"] = Shaped(Target, "4"),
+        ["group"] = Group,
     })
     ns.RF_TextTags = CATALOG
 

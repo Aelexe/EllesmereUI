@@ -1049,6 +1049,16 @@ do
         [P.healabsorb] = "habs", [P.healabsorbshort] = "habs",
         [P.name] = "id", [P.level] = "id", [P.levelcol] = "id", [P.levelcolall] = "id",
     }
+    local function Shaped(piece, mode)
+        return function(unit)
+            return EllesmereUI.ForeverShortName(piece(unit), mode)
+        end
+    end
+    for _, mode in ipairs({ "first", "last", "abbr", "10", "15", "4" }) do
+        P["name" .. mode] = Shaped(P.name, mode)
+        P["tgt" .. mode] = Shaped(P.tgtname, mode)
+        PIECE_READS[P["name" .. mode]] = "id"
+    end
 
     -- Custom content: the slot's own format string (<prefix>CustomFormat),
     -- parsed by EllesmereUI.TextTags against this binding of the unit schema.
@@ -1060,7 +1070,11 @@ do
         ["pp:max:abr"] = P.maxpp, ["pp:pct"] = P.perpp,
         ["absorb"] = P.absorb, ["absorb:abr"] = P.absorbshort,
         ["healabsorb"] = P.healabsorb, ["healabsorb:abr"] = P.healabsorbshort,
-        ["name"] = P.name, ["target"] = P.tgtname, ["level"] = P.level, ["group"] = P.group,
+        ["name"] = P.name, ["name:first"] = P.namefirst, ["name:last"] = P.namelast,
+        ["name:abbr"] = P.nameabbr, ["name:10"] = P.name10, ["name:15"] = P.name15, ["name:4"] = P.name4,
+        ["target"] = P.tgtname, ["target:first"] = P.tgtfirst, ["target:last"] = P.tgtlast,
+        ["target:abbr"] = P.tgtabbr, ["target:10"] = P.tgt10, ["target:15"] = P.tgt15, ["target:4"] = P.tgt4,
+        ["level"] = P.level, ["group"] = P.group,
     })
     ns.UF_TextTags = TAG_CATALOG
 
@@ -1124,7 +1138,7 @@ do
     -- names. ForeverShortName passes a secret name through whole and caches
     -- the short forms, so a zone repainted on every health tick builds no
     -- strings.
-    if EllesmereUI.IS_FOREVER == true then
+    if EllesmereUI.ForeverShortName then
         local short, nameFn, tgtFn = EllesmereUI.ForeverShortName, P.name, P.tgtname
         local function Twins(mode)
             return {
@@ -1132,7 +1146,10 @@ do
                 [tgtFn]  = function(u) return short(tgtFn(u), mode) end,
             }
         end
-        local twinsByMode = { first = Twins("first"), last = Twins("last") }
+        local twinsByMode = {
+            first = Twins("first"), last = Twins("last"), abbr = Twins("abbr"),
+            ["10"] = Twins("10"), ["15"] = Twins("15"), ["4"] = Twins("4"),
+        }
         local base = ns.ContentToZone
         function ns.ContentToZone(content, prefix, settings)
             local fmt, pieces, static = base(content, prefix, settings)
