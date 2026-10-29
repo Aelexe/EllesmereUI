@@ -708,7 +708,20 @@ end
 
 
 
+local function InPvPInstance()
+    if type(IsInInstance) ~= "function" then return false end
+    local _, kind = IsInInstance()
+    return kind == "pvp" or kind == "arena"
+end
+
+
+function Loot:InPvPInstance()
+    return InPvPInstance()
+end
+
+
 function Loot:DecisionKey()
+    if InPvPInstance() then return nil end
     if IsInRaid() then return "raid" end
     return addon.GroupTestActive() and "party" or nil
 end
@@ -857,7 +870,7 @@ end
 
 
 function Loot:EnsureHandling(why)
-    if not IsInRaid() then return end
+    if not IsInRaid() or InPvPInstance() then return end
     if addon.PlayerIsMasterLooter() then return end
     if Loot.handling ~= nil then return end
     if handlingAskHeld then return end
@@ -890,7 +903,7 @@ local whisperedAt = {}
 
 
 function Loot:PushHandling(why, joiners)
-    if not addon.PlayerIsMasterLooter() then return end
+    if InPvPInstance() or not addon.PlayerIsMasterLooter() then return end
     if not Loot.handling then return end
     local args = { on = true, funnel = Loot.funnelArmed == true }
     if joiners and #joiners > 0 and #joiners <= MOST_WHISPERED then
@@ -933,6 +946,8 @@ function Loot:CheckLootMaster(why)
         knownLootMaster, knownLeader = nil, nil
         return
     end
+
+    if InPvPInstance() then return end
 
 
     local current = addon.GetMasterLooter(true)

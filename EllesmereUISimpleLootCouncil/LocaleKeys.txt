@@ -44,7 +44,7 @@
 %d -> %d
 %d ITEM
 %d ITEMS
-%d URGENT
+%d Urgent
 %d already held
 %d awarded to you
 %d button
@@ -55,20 +55,10 @@
 %d entries recorded, %d imported
 %d imported
 %d item
-%d item \194\183 combat
-%d item \194\183 in range
-%d item \194\183 offline
-%d item \194\183 out of range
-%d item \194\183 out of range (dead)
 %d item is owed to %s - adding it to the trade. Press Trade to send it.
 %d item on this corpse was left in the loot window - the game does not offer it to you.
 %d item, %d awarded
 %d items
-%d items \194\183 combat
-%d items \194\183 in range
-%d items \194\183 offline
-%d items \194\183 out of range
-%d items \194\183 out of range (dead)
 %d items are owed to %s - adding them to the trade. Press Trade to send them.
 %d items on this corpse were left in the loot window - the game does not offer them to you.
 %d items, %d awarded
@@ -213,10 +203,10 @@
 %s: %s
 %s: no raids recorded
 %sIn force|r - you are not in a group.
-%sIn force|r - you lead this group.
-%sNot in force|r - %s leads this group, and no council has arrived from them yet.
-%sNot in force|r - %s leads this group, so their council is used.
-%sNot in force|r - another player leads this group.
+%sIn force|r - you are the Loot Master.
+%sNot in force|r - %s is Loot Master, and no council has arrived from them yet.
+%sNot in force|r - %s is Loot Master, so their council is used.
+%sNot in force|r - another player is Loot Master.
 %s\n\n%s
 '%s' could be any of: %s
 (Awarded to you)
@@ -236,6 +226,7 @@
 0 of 0
 A character name, for Player. Council and Raid need no name.
 A character name, then Enter.
+A player who picks this response gets a roll on the council table automatically.
 AGAINST EQUIPPED
 ANSWERED
 AWARDED
@@ -282,6 +273,7 @@ Automatic pass: %s.
 Automatically join SLC sessions?
 Automatically start session on boss kill
 Autopassed
+Autoroll
 Average equipped
 Award
 Award for
@@ -340,6 +332,7 @@ Council Members May Vote For:
 Council Rank
 Council Snapshot
 Council bags
+Council can manage queue
 Council in force: %s
 Council members can manage the loot queue
 Council members queue items and ask; the Loot Master approves each start.
@@ -381,7 +374,6 @@ Drop only, keep history
 Drop prior Loot Master delegation when passed lead
 Drop this obligation?
 Duplicate award history entries have been merged. They were caused by a bug that recorded every award twice.
-ENDED
 Each distinct one once. Off: they are still recorded in /slc log. Log to chat shows everything either way.
 Echoes the diagnostic log while reproducing a problem.
 Enable Funnel
@@ -665,6 +657,7 @@ Reset Columns
 Response
 Response %d
 Response buttons
+Response buttons locked while loot session is active
 Response buttons: %s
 Response guide
 Restore
@@ -694,10 +687,13 @@ SLC stays active for this raid - you were handed loot while it was in use.
 Seen in your group and stored by player id, so a rename or a realm transfer will not lose them.
 Selected ranks join your council automatically. Selections are per guild. If a rank is renamed, select its new name.
 Semicolon (;) - Excel in German, French and more
+Send
 Send as whisper
 Send config
 Send gay config
+Send raid message
 Send to raid
+Send whisper
 Sends your own loot council and response buttons. Each player is asked before anything of theirs is replaced.
 Sep
 Session
@@ -705,7 +701,7 @@ Session Length (seconds)
 Session running - answer for your loot.
 Session running - open the council window.
 Set award reason
-Set by the group leader while SLC is active. Yours applies when you lead.
+Set by the Loot Master while SLC is active. Yours applies when you are Loot Master.
 Set response
 Set winner
 Setup
@@ -850,12 +846,10 @@ You are not in a guild, so there is no roster to read.
 You are not in a guild.
 You declined to take part in this SLC group, so your group-loot funnel is off.
 You roll Need on group loot, everyone taking part passes, and the council distributes what lands in your bags.
-Your Loot Master settings may only be edited while you are Loot Master.
 Your Simple Loot Council settings were reset to their new defaults. Your councils, alts, response buttons, raid team and history were kept.
 Your bags
 Your guild has no rank called this - it was renamed or removed. It confers nothing until a rank of this name exists again.
-Your loot council may only be edited while you are Loot Master.
-Your response buttons were reset to their default names in your language. You can rename them in Settings.
+Your untouched response buttons now read in your language. Buttons you renamed, recoloured or added were kept.
 a bare number then '%s' reads as chat - silent. '#N' or a link would get a reply.
 a character cannot be their own main
 a delegation lasts for this raid - it is forgotten when you leave the group

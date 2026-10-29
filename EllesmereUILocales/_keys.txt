@@ -410,6 +410,7 @@ Cosmetic
 Could not build the export string.
 Could not equip gear set %s.
 Could not load talent loadout %s.
+Council can manage queue
 Count your Mythic+ applications and how they ended
 Create
 Create Custom Buff Manager

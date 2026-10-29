@@ -51,6 +51,7 @@ local function BuildVisualBars(parent, y, W, onSection, EYE)
     local optState, PP, ReloadAndUpdate = env.optState, env.PP, env.ReloadAndUpdate
     local SGet, SGetPx, SSet, SVal = env.SGet, env.SGetPx, env.SSet, env.SVal
     local SWrite = env.SWrite
+    local TexBgRowCfg = env.TexBgRowCfg
     local _, h
     local row
     local _secY  -- section start tracker
@@ -273,6 +274,7 @@ local function BuildVisualBars(parent, y, W, onSection, EYE)
                   tooltip="The bar fills with missing health, growing as the unit takes damage.",
                   get=function() return SVal("healthInvertFill", false) end,
                   set=function(v) SSet("healthInvertFill", v) end }),
+                TexBgRowCfg(SVal, SSet),
             },
         })
     end

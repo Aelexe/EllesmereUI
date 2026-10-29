@@ -187,6 +187,10 @@ end
 
 
 
+local FIXED_KIND = { lootMaster = true, raider = true, guard = true }
+
+
+
 local function Ask(kind, question, section, body, allowSilence, accept, decline, atCursor)
     if not frame then Build() end
 
@@ -198,7 +202,13 @@ local function Ask(kind, question, section, body, allowSilence, accept, decline,
 
     silenceRow.Box:SetChecked(addon.db.raidPrompt.silence and true or false)
     Reflow(allowSilence, section ~= nil)
-    if atCursor then frame:PlaceAtCursor() else frame:RestorePosition() end
+    if atCursor then
+        frame:PlaceAtCursor()
+    elseif FIXED_KIND[kind] then
+        frame:PlaceCentredHigh()
+    else
+        frame:RestorePosition()
+    end
 
     open, showing = true, kind
     frame:Show()
@@ -391,6 +401,8 @@ function RaidPrompt:Evaluate()
     if not key then
         Retire()
         askedFor, guardAskedFor = nil, nil
+
+        if addon.Loot:InPvPInstance() then return end
         if addon.Loot.handling and addon.PlayerIsMasterLooter() then
             addon.Loot:SetHandling(false)
         end

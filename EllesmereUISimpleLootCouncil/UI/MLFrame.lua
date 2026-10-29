@@ -2162,16 +2162,6 @@ local function PaintFeatured(item)
 end
 
 
-function CM.PaintLive()
-    local state = addon.Session:HasEnded() and "ended"
-        or addon.Session:IsRunning() and "live" or "idle"
-    if CM.liveKey == state then return end
-    CM.liveKey = state
-    local text = state ~= "idle" and (state == "ended" and T["ENDED"] or T["LIVE"]) or nil
-    frame:SetTag(text, state == "ended" and S.color.textMuted or S.color.good)
-end
-
-
 
 
 function CM.ShowCount()
@@ -2181,7 +2171,7 @@ function CM.ShowCount()
     if text == "" then text = nil end
     if CM.countText == text then return end
     CM.countText = text
-    if text then chip:SetText(addon.Locale.Upper(text)) end
+    if text then chip:SetText(text) end
     chip:SetShown(text ~= nil)
     P.Size(frame.Badge, math.max(CM.countSlot, text and math.ceil(chip:GetWidth()) or 0), nil)
     if frame.ClampTitle then P.AfterLayout(frame.ClampTitle) end
@@ -2198,7 +2188,6 @@ end
 local function PaintTallies(items, item, full)
     CM.SetCount("council", #items > 0 and addon.Locale.Format(T["%d of %d"],
         math.min(selectedSession, #items), #items) or nil)
-    CM.PaintLive()
 
 
 
@@ -2393,7 +2382,6 @@ end
 
 function MLFrame:UpdateTimer()
     if not frame or not frame:IsShown() then return end
-    CM.PaintLive()
 
     local left = addon.Session:GetTimeLeft()
     local duration = addon.Session:GetTimerDuration()
@@ -2469,9 +2457,9 @@ function CM.Build()
     timerLabel = S.Label(strip, S.fontHeading, "RIGHT")
     timerLabel:SetPoint("RIGHT", timerText, "LEFT", -6, 0)
 
-    CM.countChip = S.Chip(frame.Tag:GetParent(), "", S.color.textMuted,
-        { height = frame.Tag:GetHeight(), font = S.fontTag,
-            padding = frame.TagPadding or 9, square = true })
+    CM.countChip = S.Chip(frame.Tag:GetParent(), "", S.color.accent,
+        { height = frame.Tag:GetHeight(), font = S.fontBody,
+            padding = frame.TagPadding or 9, square = true, plain = true })
     CM.countChip:SetPoint("RIGHT", frame.Close, "LEFT", -S.size.GAP, 0)
     CM.countChip:Hide()
     CM.countSlot = frame.Badge:GetWidth()
@@ -3020,8 +3008,7 @@ function CM.ShowTab(key)
         rollButton:Hide()
         menuHint:Hide()
     end
-    CM.liveKey, CM.countText = nil, nil
-    CM.PaintLive()
+    CM.countText = nil
     CM.ShowCount()
     for _, button in ipairs(CM.queueButtons) do button:SetShown(queue) end
     CM.responseButton:SetShown(response)

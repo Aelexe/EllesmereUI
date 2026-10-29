@@ -1157,6 +1157,12 @@ L["whisper / w [text]"] = "whisper / w [texto]"
 L["you are not in this run - there is nothing to show you."] = "você não está nesta rodada - não há nada para mostrar."
 L["your view of the run"] = "sua visão da rodada"
 L["your view of the run (alt. sess)"] = "sua visão da rodada (alt. sess)"
+
+-- == Autoroll and response-button notices, from the Simple Loot Council standalone translations ==
+L["A player who picks this response gets a roll on the council table automatically."] = "Um jogador que escolhe esta resposta recebe automaticamente uma rolagem na tabela do conselho."
+L["Autoroll"] = "Rolagem automática"
+L["Response buttons locked while loot session is active"] = "Botões de resposta bloqueados enquanto uma sessão de saque estiver ativa"
+L["Your untouched response buttons now read in your language. Buttons you renamed, recoloured or added were kept."] = "Seus botões de resposta não alterados agora aparecem no seu idioma. Os botões que você renomeou, recolorou ou adicionou foram mantidos."
 -- == Simple Loot Council: response guide, options page, commands ==============
 L["%s asked for the response guide."] = "%s pediu o guia de respostas."
 L["%s has already been awarded and traded to %s."] = "%s já foi atribuído e negociado com %s."

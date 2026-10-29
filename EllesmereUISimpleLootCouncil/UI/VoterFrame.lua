@@ -826,7 +826,7 @@ local function Build()
 
 
     local tagHeight = frame.Tag:GetHeight()
-    local probe = S.Label(frame, S.fontTag, "LEFT")
+    local probe = S.Label(frame, S.fontBody, "LEFT")
     local expandWidth = 0
     for _, label in ipairs({ T["Expand"], T["Compact"] }) do
         probe:SetText(label)
@@ -836,9 +836,10 @@ local function Build()
     probe:Hide()
     if expandWidth <= 0 then expandWidth = 60 end
 
-    compactButton = S.Chip(frame, "", S.color.textMuted, {
-        height = tagHeight, font = S.fontTag, padding = 9, square = true,
-        minWidth = math.ceil(expandWidth) + 18,
+    local tagPad = frame.TagPadding or 8
+    compactButton = S.Chip(frame, "", S.color.accent, {
+        height = tagHeight, font = S.fontBody, padding = tagPad, square = true, plain = true,
+        minWidth = math.ceil(expandWidth) + tagPad * 2,
     })
     compactButton.SetLabel = compactButton.SetText
     compactButton:EnableMouse(true)
@@ -849,8 +850,8 @@ local function Build()
             VoterFrame:SetCompact(not addon.db.voterCompact)
         end
     end)
-    compactButton:SetScript("OnEnter", function(self) self:SetChipColor(S.color.text) end)
-    compactButton:SetScript("OnLeave", function(self) self:SetChipColor(S.color.textMuted) end)
+    compactButton:SetScript("OnEnter", function(self) self:SetHighlight(true) end)
+    compactButton:SetScript("OnLeave", function(self) self:SetHighlight(false) end)
     frame.Badge:ClearAllPoints()
     P.Point(frame.Badge, "RIGHT", compactButton, "LEFT", -S.size.GAP, 0)
     P.Size(frame.Badge, 1, nil)

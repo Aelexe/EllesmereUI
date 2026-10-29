@@ -7,13 +7,13 @@
 ## X-License: All Rights Reserved
 ## Version: 9.7
 ## DefaultState: disabled
-## X-SLC-Version: 0.45.29
-## X-SLC-Commit: 65eb14f23161
-## X-SLC-Port-Commit: 79a97b4481d3
+## X-SLC-Version: 0.45.40
+## X-SLC-Commit: 5f32e686f11b
+## X-SLC-Port-Commit: 9e5eff484c1d
+## Dependencies: EllesmereUI
 # Held back (EllesmereUI.HELD_BACK_ADDONS): load on demand, and nothing loads
 # it, so it never loads and its saved data stays untouched. Drop this to ship.
 ## LoadOnDemand: 1
-## Dependencies: EllesmereUI
 ## SavedVariables: EllesmereUISimpleLootCouncilDB
 ## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga
 
@@ -46,6 +46,7 @@ Core\Storage.lua
 Core\Encounter.lua
 Core\Attendance.lua
 Core\WowauditFileOpen.lua
+SimulationImport\SLC_WoWAuditSimData.lua
 Core\WowauditFileClose.lua
 Core\Wishlist.lua
 Core\Loot.lua

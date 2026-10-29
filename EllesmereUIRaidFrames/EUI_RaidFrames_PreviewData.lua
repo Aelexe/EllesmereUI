@@ -166,6 +166,9 @@ local function ApplyPreviewData(f, index, roles, classTokens)
                 end
             end
         end
+        -- Textured Background, as on the live frames.
+        ns.RF_TexBgLayer(f._health, f._bg, not f.kit
+            and ns.RF_TexBgOpaque(s, s.healthColorMode == "dark") and ns.RF_TexBgPath(s) or nil)
         if s.healthColorMode == "dark" then
             AnchorPreviewBg()
             f._bg:SetColorTexture(EllesmereUI.GetDarkModeBg())
@@ -761,6 +764,7 @@ local function ApplyPreviewData(f, index, roles, classTokens)
                 and EllesmereUI.GetPowerColor(EllesmereUI.CLASS_POWER_MAP[classToken] or "MANA")
             local pf = bgc and EllesmereUI.GetPowerBgDarkenFactor() or 1
             bgc = bgc or s.powerBgColor
+            ns.RF_TexBgTint(f._powerBg, ns.RF_TexBgPath(s))
             f._powerBg:SetColorTexture(((bgc or {}).r or 0) * pf, ((bgc or {}).g or 0) * pf, ((bgc or {}).b or 0) * pf, (s.powerBgDarkness or 70) / 100)
             f._powerBg:Show()
         end

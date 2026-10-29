@@ -1020,10 +1020,13 @@ SlashCmdList["SIMPLELOOTCOUNCIL"] = function(input)
         if who:lower() == "clear" then
             addon.db.lootMaster = nil
             addon.InvalidateMasterLooter()
+            addon.Config:ClearShared("delegation cleared")
+            addon.Council:ForgetDelegateHeard()
             if onMasterLoot then
                 HandGameMasterLoot("player", addon.Player:GetFullName("player") or "?")
             end
-            addon.Council:Broadcast()
+
+            addon.Council:Broadcast(true)
             Print(addon.Locale.Format(T["Loot Master reset to the group leader: %s"],
                 tostring(addon.Player:GetFullName("player") or addon.GetMasterLooter())))
             return
@@ -1046,7 +1049,11 @@ SlashCmdList["SIMPLELOOTCOUNCIL"] = function(input)
 
         addon.db.lootMaster = record.guid
         addon.InvalidateMasterLooter()
-        addon.Council:Broadcast()
+
+
+        addon.Config:ClearShared("delegation changed")
+        addon.Council:ForgetDelegateHeard()
+        addon.Council:Broadcast(true)
         Print(addon.Locale.Format(T["Loot Master set to %s for this raid"],
             record.fullName))
         if onMasterLoot then

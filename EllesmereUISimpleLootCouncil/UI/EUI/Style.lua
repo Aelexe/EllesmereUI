@@ -857,8 +857,8 @@ function S.Chip(parent, text, c, opts)
     local chip = CreateFrame("Frame", nil, parent)
 
     local label = S.Label(chip, opts.font or S.fontMicro, "CENTER")
-    label:SetText(text or "")
-    P.Point(label, "CENTER", chip, "CENTER", 0, 0)
+
+    P.Point(label, "CENTER", chip, "CENTER", 0, opts.plain and -1 or 0)
 
     local fill = chip:CreateTexture(nil, "BACKGROUND")
     fill:SetAllPoints(chip)
@@ -882,13 +882,24 @@ function S.Chip(parent, text, c, opts)
     function chip:SetChipColor(nc)
         nc = nc or color.textMuted
         current = nc
-        fill:SetColorTexture(Unpack(nc, 0.12))
+        fill:SetColorTexture(Unpack(nc, opts.plain and 0 or 0.12))
         border:SetColor(lit and bright(nc) or nc)
         label:SetTextColor(Unpack(opts.textColor or nc))
     end
 
+
+    local function Plain(value)
+        local first, rest = value:match("^([%z\1-\127\194-\244][\128-\191]*)(.*)$")
+        if first then value = addon.Locale.Upper(first) .. addon.Locale.Lower(rest) end
+        local num, word, tail = value:match("^(%d+%s+)([%z\1-\127\194-\244][\128-\191]*)(.*)$")
+        if num and not tail:find("%d") then value = num .. addon.Locale.Upper(word) .. tail end
+        return value
+    end
+
     function chip:SetText(value)
-        label:SetText(value or "")
+        value = value or ""
+        if opts.plain and value ~= "" then value = Plain(value) end
+        label:SetText(value)
         chip:Fit()
     end
 
@@ -898,7 +909,7 @@ function S.Chip(parent, text, c, opts)
         local minWidth = opts.minWidth or 0
 
 
-        if opts.font == S.fontTag then
+        if opts.plain or opts.font == S.fontTag then
             padding = math.max(0, padding - 2)
             minWidth = math.max(0, minWidth - 4)
         end
@@ -913,7 +924,7 @@ function S.Chip(parent, text, c, opts)
     end
 
     chip:SetChipColor(c)
-    chip:Fit()
+    chip:SetText(text)
     chip.Label = label
     return chip
 end
@@ -1637,7 +1648,7 @@ end
 
 
 
-local TAG_H = 24
+local TAG_H = size.CLOSE
 local TAG_SQUARE_H = 18
 local TAG_INSET = 5
 local TITLE_BAND_RATIO = 1.7
@@ -1957,7 +1968,7 @@ function S.Window(globalName, key, width, height, title, options)
         tag:EnableMouse(false)
     else
         tag = S.Chip(header, "", color.textMuted,
-            { height = TAG_H, font = S.fontTag, padding = 8, square = true })
+            { height = TAG_H, font = S.fontBody, padding = 8, square = true, plain = true })
         f.TagPadding = 8
     end
     P.Point(tag, "LEFT", titleText, "RIGHT", size.TAG_GAP, 0)
@@ -1998,9 +2009,39 @@ end
 
 
 
+local confirmOpen
+local dimmerHooked
+
+local function ConfirmClosed(entry, how)
+    if entry.done then return end
+    entry.done = true
+    if confirmOpen == entry then confirmOpen = nil end
+    if entry.onClose then entry.onClose(how) end
+end
+
+
+function S.ConfirmBusy()
+    return EUIConfirmDimmer ~= nil and EUIConfirmDimmer:IsShown() and true or false
+end
+
+
+local function HookDimmer()
+    if dimmerHooked or not EUIConfirmDimmer then return end
+    dimmerHooked = true
+    EUIConfirmDimmer:HookScript("OnHide", function()
+        local entry = confirmOpen
+        if entry then C_Timer.After(0, function() ConfirmClosed(entry, "replaced") end) end
+    end)
+end
+
+
+
 
 function S.Confirm(options)
     options = options or {}
+    if confirmOpen then ConfirmClosed(confirmOpen, "replaced") end
+    local entry = { onClose = options.onClose }
+    confirmOpen = entry
 
     local body = options.body or ""
     local prompt, detail = body:match("^(.-)\n\n(.*)$")
@@ -2012,21 +2053,28 @@ function S.Confirm(options)
     local acknowledge = options.acknowledge and true or false
     local alternate = not acknowledge and options.alternate or nil
 
-    return EUI:ShowConfirmPopup({
+
+    local handle = EUI:ShowConfirmPopup({
         title       = options.title or T["Are you sure?"],
         message     = prompt,
         disclaimer  = detail,
         checkbox    = alternate,
         confirmText = acknowledge and T["OK"] or (options.accept or T["Confirm"]),
-        cancelText  = T["Cancel"],
+        cancelText  = options.cancel or T["Cancel"],
         hideCancel  = acknowledge or nil,
         onConfirm   = function(checked)
-            if acknowledge then return end
-            if checked and alternate then
+
+            if acknowledge then return ConfirmClosed(entry, "cancel") end
+            local take = checked and alternate
+            ConfirmClosed(entry, take and "alternate" or "accept")
+            if take then
                 if options.onAlternate then options.onAlternate() end
             elseif options.onAccept then
                 options.onAccept()
             end
         end,
+        onCancel    = function() ConfirmClosed(entry, "cancel") end,
     })
+    HookDimmer()
+    return handle
 end

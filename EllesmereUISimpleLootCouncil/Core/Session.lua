@@ -2778,6 +2778,15 @@ local function ApplyAnswer(what, session, candidateName, response, note, sender,
     if gearSaid and addon.Gear then addon.Gear:ApplyToCandidate(candidate, gear) end
     Touch(session, candidateName, true, true, gearSaid)
 
+
+
+    local stressing = addon.Perf and addon.Perf:IsStressing()
+    local def = index and addon.Roll and not stressing and addon.PlayerIsMasterLooter()
+        and addon.Config:Responses()[index]
+    if def and def.autoroll and candidate.status == "RESPONDED" and not candidate.roll then
+        addon.Roll:SetOne(session, candidateName, true)
+    end
+
     if whispered then
         addon.Log:I("Session", "whispered response", session, candidateName,
             tostring(index), "relayed by", tostring(sender))
