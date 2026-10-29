@@ -1239,8 +1239,9 @@ local function CreateDMWindow(winIdx)
         -- Tracked through guarded pin/unpin resizes too, so "grew" compares against the real last height.
         local grew = h and h > (W._vpH or 0)
         W._vpH = h
-        if W.stickyGuard then return end
+        -- Before the guard: a profile swap's resize can land inside a sticky pass.
         if w and w > 0 then content:SetWidth(w) end
+        if W.stickyGuard then return end
         W.UpdateSticky(nil, W.visibleCount)
         if W._decorSync then ns.DMSyncRowDecor(W) end
         -- A taller viewport reveals rows the last pass skipped; the grip drag queues once on release.
