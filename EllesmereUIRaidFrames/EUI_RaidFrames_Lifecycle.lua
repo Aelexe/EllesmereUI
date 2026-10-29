@@ -446,20 +446,24 @@ function ERF:OnEnable()
     end
     ns._RFSyncLevelRegistration()
 
-    -- Custom texts: UNIT_TARGET only while a view's Custom text shows [target]; a Custom
-    -- text reading power keeps the power events of units whose power bar is off
-    -- (UpdatePowerEventRegistration below re-runs on that flip). Called with the level's
-    -- sync; the stamps keep the walks to real flips.
-    local tgtRegistered, htPowerWanted = false, false
+    -- Custom texts: UNIT_TARGET only while a view's Custom text shows [target]. A Custom
+    -- text reading power keeps the power events of units whose power bar is off: the raid
+    -- view's on every unit (raid frames show a party on its player and party tokens), the
+    -- party view's on those tokens only (UpdatePowerEventRegistration below reads the
+    -- stamps and re-runs on a flip). Called with the level's sync; the stamps keep the
+    -- walks to real flips.
+    local tgtRegistered, raidPowerWanted, partyPowerWanted = false, false, false
     function ns._RFSyncCustomRegistration()
         local want = ns.RF_TextWanted("tgt")
         if want ~= tgtRegistered then
             tgtRegistered = want
             SyncOptInEvent("UNIT_TARGET", want)
         end
-        want = ns.RF_TextWanted("pp")
-        if want ~= htPowerWanted then
-            htPowerWanted = want
+        local r = ns.RF_TextPlan(ns._scaledProfile).reads
+        local p = ns.RF_TextPlan(ns._scaledPartyProxy).reads
+        local raidPP, partyPP = (r and r.pp) and true or false, (p and p.pp) and true or false
+        if raidPP ~= raidPowerWanted or partyPP ~= partyPowerWanted then
+            raidPowerWanted, partyPowerWanted = raidPP, partyPP
             if ns.UpdatePowerEventRegistration then ns.UpdatePowerEventRegistration() end
         end
     end
@@ -488,20 +492,20 @@ function ERF:OnEnable()
         -- power events while its mode matches the current group type,
         -- whatever the power bar settings.
         local hmOn = ns._HMActive and ns._HMActive()
-        -- A Custom text reading power needs every unit's power events.
-        local htPower = ns.RF_TextWanted("pp")
         for unit, tracker in pairs(unitTrackers) do
             local wantPower = false
             if UnitExists(unit) then
                 local role = ns._ResolvePowerRole(unit)
                 wantPower = (IsPowerBarEnabled(rs) and wantsPower(rs, role))
-                    or (hmOn and role == "HEALER") or htPower
+                    or (hmOn and role == "HEALER") or raidPowerWanted
                 -- player/party tokens always count as party-displayable; the
                 -- routing-map check additionally covers arena, where the party
                 -- header binds raid1-5.
                 if not wantPower and (unit == "player" or unit:match("^party%d$")
                         or (ns._partyUnitToButton and ns._partyUnitToButton[unit])) then
-                    if ns.RF_PartyKit() then
+                    if partyPowerWanted then
+                        wantPower = true
+                    elseif ns.RF_PartyKit() then
                         -- Party Frames kit: the stock mana bar always shows
                         -- (while the party frames are shown; the hide edge
                         -- re-runs this through RF_KitPortraitEvents).

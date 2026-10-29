@@ -2727,7 +2727,7 @@ local function CreateDMWindow(winIdx)
         local _, iType = IsInInstance()
         if wdb.hideInDungeon and iType == "party" then return true end
         if wdb.hideInRaid and iType == "raid" then return true end
-        if wdb.hideInDelve and C_PartyInfo and C_PartyInfo.IsDelveInProgress and C_PartyInfo.IsDelveInProgress() then return true end
+        if wdb.hideInDelve and EUI.IsInDelve() then return true end
         if wdb.hideInPvP and (iType == "pvp" or iType == "arena") then return true end
         if wdb.hideOutOfInstance and (iType == "none" or iType == nil) then return true end
         return false

@@ -45,9 +45,6 @@ end
 -------------------------------------------------------------------------------
 local CustomText = {}
 do
-    local EDIT_ICON = "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-edit.png"
-    CustomText.EDIT_ICON = EDIT_ICON
-
     -- The text's colour mode as the preview shows it, for the player's class and power.
     function CustomText.Color(t)
         local SVal = ns._RFO_OptEnv.SVal
@@ -59,73 +56,28 @@ do
 
     -- key: the format key (party-aware through the page's SVal/SWrite); onSave
     -- runs after the format is stored.
-    function CustomText.Edit(key, color, onSave, warning)
+    function CustomText.Edit(key, color, onSave)
         local env = ns._RFO_OptEnv
-        local cur = env.SVal(key)
-        -- Stored with single pipes; the edit box holds a typed "|" doubled.
-        if type(cur) == "string" then cur = cur:gsub("|", "||") else cur = nil end
-        -- 120 letters for new input; a longer stored format (import) keeps its length.
-        local maxLen = math.max(120, cur and (strlenutf8 and strlenutf8(cur) or #cur) or 0)
-        local popupOpts = {
-            title = EllesmereUI.L("Custom Text"),
-            message = EllesmereUI.L("Tags in [brackets] show live values, other text stays as typed.") .. "\n"
-                .. EllesmereUI.L("Type [ for suggestions, the (i) lists every tag."),
-            messageSize = 10,
-            previewColor = color,
-            placeholder = "[name] - [hp:pct]%",
-            initialText = (not warning and cur) or "",
-            maxLetters = maxLen,
-            showCount = true,
-            warning = warning,
-            onConfirm = function(txt)
-                txt = tostring(txt or ""):gsub("||", "|"):gsub("^%s+", ""):gsub("%s+$", "")
-                -- Spaces only: show the popup again instead of closing unsaved.
-                if txt == "" then
-                    CustomText.Edit(key, color, onSave, EllesmereUI.L("Enter at least one tag or character."))
-                    return
-                end
-                env.SWrite(key, txt)
-                onSave()
-            end,
-        }
-        EllesmereUI.TextTags.PopupOpts(ns.RF_TextTags, popupOpts, {
+        EllesmereUI.TextTags.EditPopup({
+            cat = ns.RF_TextTags, color = color, onSave = onSave,
             tagNotes = { hp = EllesmereUI.L("shows DEAD or OFFLINE") },
+            get = function() return env.SVal(key) end,
+            set = function(txt) env.SWrite(key, txt) end,
         })
-        EllesmereUI:ShowInputPopup(popupOpts)
     end
 
     -- A copy of a mode list whose Custom entry is an action that opens the popup,
-    -- marked with the edit pencil, beside Remove in the house red.
+    -- beside Remove in the house red.
     function CustomText.Values(values, edit)
-        local v = CopyTable(values)
-        if edit then v.custom = { text = "Custom", action = edit } end
-        v._menuOpts = {
-            icon = function(key)
-                if key == "custom" then return EDIT_ICON end
-                if key == "none" then return "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-close.png" end
-            end,
-            iconSize = function() return 12 end,
-            iconClearScroll = true,
-            iconColor = function(key)
-                if key == "custom" then return 1, 1, 1, 1 end
-                if key == "none" then return 1, 0.35, 0.35, 0.75 end
-            end,
-            labelColor = function(key)
-                if key == "none" then return 1, 0.35, 0.35, 0.8 end
-            end,
-        }
-        return v
+        return EllesmereUI.TextTags.MenuValues(values, edit, { removeKey = "none" })
     end
 
     -- The popup writes the format directly, so Spec Overrides needs an accessor.
     function CustomText.AddAccessor(rgn, label, key)
-        if not EllesmereUI.AddCaptureAccessor then return end
         local env = ns._RFO_OptEnv
-        EllesmereUI.AddCaptureAccessor(rgn, {
-            type = "input", text = label .. " Custom Format",
-            getValue = function() return env.SVal(key, "") end,
-            setValue = function(v) env.SSet(key, (v ~= "" and v) or nil) end,
-        })
+        EllesmereUI.TextTags.AddFormatAccessor(rgn, label,
+            function() return env.SVal(key) end,
+            function(v) env.SSet(key, v) end)
     end
 end
 
@@ -287,20 +239,18 @@ function ns.RFO_BuildTextDisplay(W, parent, y, opts)
                     end, function() end, "power", false, "Power Colored Text")
             end
             -- The mode is written only by the swatch clicks above.
-            if EllesmereUI.AddCaptureAccessor then
-                local modeValues = { custom = "Custom Color", class = "Class Color", accent = "Accent Color" }
-                local modeOrder = { "custom", "class", "accent" }
-                if AllowsPower(t) then
-                    modeValues.power = "Power Colored Text"
-                    modeOrder[4] = "power"
-                end
-                EllesmereUI.AddCaptureAccessor(rgn, {
-                    type = "dropdown", text = t.label .. " Color Mode",
-                    values = modeValues, order = modeOrder,
-                    getValue = function() return SVal(modeKey, "custom") end,
-                    setValue = function(v) env.SSet(modeKey, v) end,
-                })
+            local modeValues = { custom = "Custom Color", class = "Class Color", accent = "Accent Color" }
+            local modeOrder = { "custom", "class", "accent" }
+            if AllowsPower(t) then
+                modeValues.power = "Power Colored Text"
+                modeOrder[4] = "power"
             end
+            EllesmereUI.AddCaptureAccessor(rgn, {
+                type = "dropdown", text = t.label .. " Color Mode",
+                values = modeValues, order = modeOrder,
+                getValue = function() return SVal(modeKey, "custom") end,
+                setValue = function(v) env.SSet(modeKey, v) end,
+            })
         end
         local rows = {
             { type = "slider", label = "Size", min = 6, max = 26, step = 1,
@@ -415,7 +365,7 @@ function ns.RFO_BuildTextDisplay(W, parent, y, opts)
         table.insert(addOrder, 1, customId)
         if #addOrder > 1 then table.insert(addOrder, 2, "---") end
         addValues._menuOpts = {
-            icon = function(key) if key == customId then return CustomText.EDIT_ICON end end,
+            icon = function(key) if key == customId then return EllesmereUI.TextTags.EDIT_ICON end end,
             iconSize = function() return 12 end,
             iconClearScroll = true,
             iconColor = function(key) if key == customId then return 1, 1, 1, 1 end end,
