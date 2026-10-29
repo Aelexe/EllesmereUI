@@ -2,7 +2,8 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --------------------------------------------------------------------------------
 --  EllesmereUI_TextTags.lua
 --  Custom text templates ("[hp:abr] | [hp:pct]%"): shared tag schema, parser,
---  preview and help text. Pure string logic: no frames, events or units.
+--  preview and help text. Pure string logic (no frames, events or units), plus
+--  the options glue a Custom text field shares (PopupOpts and below it).
 --  A module binds the schema keys it draws to its own pieces (Bind) and paints
 --  the parse through its own path: fmt has one %s per tag, keys names each one.
 --  Secret values, DEAD/OFFLINE and abbreviation stay in the module's pieces.
@@ -440,4 +441,89 @@ function TextTags.PopupOpts(cat, opts, helpOpts)
     opts.infoTooltip = function() return TextTags.HelpText(cat, helpOpts) end
     opts.infoTooltipOpts = { width = 360, justify = "LEFT", anchorPoint = "TOPRIGHT", anchorTo = "TOPLEFT", anchorX = -8 }
     return opts
+end
+
+-------------------------------------------------------------------------------
+--  A Custom text field's options: the template popup, the dropdown entry that
+--  opens it and the Spec Overrides accessor, shared by every module offering
+--  Custom text. Called only from options pages.
+-------------------------------------------------------------------------------
+local EDIT_ICON = "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-edit.png"
+local CLOSE_ICON = "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-close.png"
+TextTags.EDIT_ICON = EDIT_ICON
+
+--- The template popup. o: cat (the module's catalog), get() / set(text) (the stored
+--- template, single pipes), color (the preview's text colour; nil = white), tagNotes
+--- (as TextTags.HelpText's), onSave (after the template is stored). Spaces only opens
+--- the popup again with a hint instead of closing unsaved.
+function TextTags.EditPopup(o, warning)
+    local cur = o.get()
+    -- The edit box holds a typed "|" doubled.
+    if type(cur) == "string" then cur = sgsub(cur, "|", "||") else cur = nil end
+    -- 120 letters for new input; a longer stored template (import) keeps its length.
+    local maxLen = math.max(120, cur and strlenutf8(cur) or 0)
+    local popupOpts = {
+        title = EllesmereUI.L("Custom Text"),
+        message = EllesmereUI.L("Tags in [brackets] show live values, other text stays as typed.") .. "\n"
+            .. EllesmereUI.L("Type [ for suggestions, the (i) lists every tag."),
+        messageSize = 10,
+        previewColor = o.color,
+        placeholder = "[name] - [hp:pct]%",
+        initialText = (not warning and cur) or "",
+        maxLetters = maxLen,
+        showCount = true,
+        warning = warning,
+        onConfirm = function(txt)
+            txt = sgsub(sgsub(sgsub(tostring(txt or ""), "||", "|"), "^%s+", ""), "%s+$", "")
+            if txt == "" then
+                TextTags.EditPopup(o, EllesmereUI.L("Enter at least one tag or character."))
+                return
+            end
+            o.set(txt)
+            if o.onSave then o.onSave() end
+        end,
+    }
+    TextTags.PopupOpts(o.cat, popupOpts, o.tagNotes and { tagNotes = o.tagNotes } or nil)
+    EllesmereUI:ShowInputPopup(popupOpts)
+end
+
+--- A copy of a text dropdown's values whose "custom" entry is an action opening the
+--- popup (edit; nil adds none), marked with the edit pencil. o.selected(): the pencil
+--- at full alpha while true (nil: always); o.removeKey: that entry in the house red
+--- with the close X. The values' own _menuOpts still dress their other entries; the
+--- menu reads all of it when it is built.
+function TextTags.MenuValues(values, edit, o)
+    local v = CopyTable(values)
+    if edit then v.custom = { text = "Custom", action = edit } end
+    local mo = v._menuOpts or {}
+    v._menuOpts = mo
+    local icon, iconColor, labelColor = mo.icon, mo.iconColor, mo.labelColor
+    local selected, removeKey = o and o.selected, o and o.removeKey
+    mo.icon = function(key)
+        if key == "custom" then return EDIT_ICON end
+        if key == removeKey then return CLOSE_ICON end
+        if icon then return icon(key) end
+    end
+    mo.iconSize = mo.iconSize or function() return 12 end
+    mo.iconClearScroll = true
+    mo.iconColor = function(key)
+        if key == "custom" then return 1, 1, 1, (not selected or selected()) and 1 or 0.75 end
+        if key == removeKey then return 1, 0.35, 0.35, 0.75 end
+        if iconColor then return iconColor(key) end
+    end
+    mo.labelColor = function(key)
+        if key == removeKey then return 1, 0.35, 0.35, 0.8 end
+        if labelColor then return labelColor(key) end
+    end
+    return v
+end
+
+--- Spec Overrides' accessor for a template the popup writes directly: the capture
+--- reads and restores it as label .. " Custom Format" (get() / set(v); nil clears).
+function TextTags.AddFormatAccessor(rgn, label, get, set)
+    EllesmereUI.AddCaptureAccessor(rgn, {
+        type = "input", text = label .. " Custom Format",
+        getValue = function() return get() or "" end,
+        setValue = function(v) set((v ~= "" and v) or nil) end,
+    })
 end

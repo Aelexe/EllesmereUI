@@ -2278,6 +2278,9 @@ end
 -- resize), anchored uses the edge opposite its anchor side (grows away from it).
 UM.ApplyCenterPosition = function(barKey, pos)
     if not pos or pos.point ~= "CENTER" or pos.relPoint ~= "CENTER" then return false end
+    -- Grouped bars and other addon-owned elements keep their relative anchors.
+    local elem = registeredElements[barKey]
+    if elem and elem.isAnchored and elem.isAnchored(barKey) then return true end
     local frame = UM.GetBarFrame(barKey)
     if not frame then return false end
 

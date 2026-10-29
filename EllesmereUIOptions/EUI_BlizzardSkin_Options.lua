@@ -2653,6 +2653,16 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.reskinTrade = v
             end,
         },
+        {
+            key   = "flagcarrier",
+            title = "Flag Carriers",
+            desc  = "The battleground flag and orb carrier frames: health and mana bars flat on a dark panel, squared trinket and cast icons, and the carrier's pet. The class and faction icons and the cast bar's fill stay as Blizzard draws them.",
+            reloadMsg = "Changing the Flag Carriers reskin requires a UI reload to fully swap between Blizzard and Ellesmere styles.",
+            setEnabled = function(v)
+                if not EllesmereUIDB then EllesmereUIDB = {} end
+                EllesmereUIDB.reskinFlagCarriers = v
+            end,
+        },
     }
 
     -- WoW Forever drops the cards for windows it does not skin or has no use
@@ -4205,6 +4215,7 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.reskinDelvePicker = nil
                 EllesmereUIDB.reskinPlayerChoice = nil
                 EllesmereUIDB.reskinTrade = nil
+                EllesmereUIDB.reskinFlagCarriers = nil
                 EllesmereUIDB.windowSkinsStockSeeded = nil
                 EllesmereUIDB.windowSkinStyleSlots = nil
                 EllesmereUIDB.reskinWidgetBars = nil

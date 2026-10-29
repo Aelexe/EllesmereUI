@@ -53,76 +53,28 @@ for i = 1, #ns.NPO_TEXT_SLOTS do
     POS_VALUES[s.key] = s.menu
 end
 
--- Custom text popup for a text position, a copy of the Unit Frames' one (that
--- module's options may be off): the template is stored with single pipes in
+-- Custom text popup for a text position: the template is stored in
 -- <slot>CustomFormat, then onSave selects Custom for the position.
-function ns.NPO_EditCustomText(slotKey, onSave, warning)
+function ns.NPO_EditCustomText(slotKey, onSave)
     local env = ns._NPO_OptEnv
     local key = slotKey .. "CustomFormat"
-    local cur = env.DB()[key]
-    -- The edit box holds a typed "|" doubled.
-    if type(cur) == "string" then cur = cur:gsub("|", "||") else cur = nil end
-    -- 120 letters for new input; a longer stored template (import) keeps its length.
-    local maxLen = math.max(120, cur and (strlenutf8 and strlenutf8(cur) or #cur) or 0)
-    -- The slot's colour as the nameplate preview paints it (Text Coloring mode);
-    -- the slot colour if the preview file did not load.
-    local c = (ns.NPO_PreviewSlotColor and ns.NPO_PreviewSlotColor(slotKey))
-        or env.DBVal(slotKey .. "Color") or env.defaults[slotKey .. "Color"]
-    local popupOpts = {
-        title = EllesmereUI.L("Custom Text"),
-        message = EllesmereUI.L("Tags in [brackets] show live values, other text stays as typed.") .. "\n"
-            .. EllesmereUI.L("Type [ for suggestions, the (i) lists every tag."),
-        messageSize = 10,
-        previewColor = c and { r = c.r, g = c.g, b = c.b },
-        placeholder = "[name] - [hp:pct]%",
-        initialText = (not warning and cur) or "",
-        maxLetters = maxLen,
-        showCount = true,
-        warning = warning,
-        onConfirm = function(txt)
-            txt = tostring(txt or ""):gsub("||", "|"):gsub("^%s+", ""):gsub("%s+$", "")
-            -- Spaces only: show the popup again instead of closing unsaved.
-            if txt == "" then
-                ns.NPO_EditCustomText(slotKey, onSave, EllesmereUI.L("Enter at least one tag or character."))
-                return
-            end
-            env.DB()[key] = txt
-            onSave()
-        end,
-    }
-    if ns.NP_TextTags then
-        EllesmereUI.TextTags.PopupOpts(ns.NP_TextTags, popupOpts, {
-            tagNotes = { hp = EllesmereUI.L("shows DEAD") },
-        })
-    end
-    EllesmereUI:ShowInputPopup(popupOpts)
+    -- The slot's colour as the nameplate preview paints it (Text Coloring mode),
+    -- copied: the level colour is a reused table.
+    local c = ns.NPO_PreviewSlotColor(slotKey)
+    EllesmereUI.TextTags.EditPopup({
+        cat = ns.NP_TextTags, color = c and { r = c.r, g = c.g, b = c.b }, onSave = onSave,
+        tagNotes = { hp = EllesmereUI.L("shows DEAD") },
+        get = function() return env.DB()[key] end,
+        set = function(txt) env.DB()[key] = txt end,
+    })
 end
 
 -- A copy of the text dropdown's values whose Custom entry is an action that opens
--- the popup (edit), marked with the edit pencil at full alpha while getValue() is
--- "custom" (the menu reads it when built; a selection rebuilds the page). Remove
--- in the house BAD red with the close X, as in the Unit Frames' text list.
-local EDIT_ICON = "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-edit.png"
-local CLOSE_ICON = "Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-close.png"
+-- the popup (edit), its pencil at full alpha while getValue() is "custom" (the menu
+-- reads it when built; a selection rebuilds the page); Remove in the house red.
 function ns.NPO_CustomTextValues(values, getValue, edit)
-    local v = CopyTable(values)
-    v.custom = { text = "Custom", action = edit }
-    v._menuOpts = {
-        icon = function(key)
-            if key == "custom" then return EDIT_ICON end
-            if key == "none" then return CLOSE_ICON end
-        end,
-        iconSize = function() return 12 end,
-        iconClearScroll = true,
-        iconColor = function(key)
-            if key == "custom" then return 1, 1, 1, getValue() == "custom" and 1 or 0.75 end
-            if key == "none" then return 1, 0.35, 0.35, 0.75 end
-        end,
-        labelColor = function(key)
-            if key == "none" then return 1, 0.35, 0.35, 0.8 end
-        end,
-    }
-    return v
+    return EllesmereUI.TextTags.MenuValues(values, edit,
+        { removeKey = "none", selected = function() return getValue() == "custom" end })
 end
 
 -- A position shows a text while its element is a KNOWN one.
@@ -3170,15 +3122,10 @@ local function BuildDisplayLayout(parent, y, ctx)
         -- an accessor, on a Custom text or one holding a template an override may
         -- switch back to.
         local fk = c.key .. "CustomFormat"
-        if EllesmereUI.AddCaptureAccessor and (DBVal(c.key) == "custom" or type(DBVal(fk)) == "string") then
-            EllesmereUI.AddCaptureAccessor(rgn, {
-                type = "input", text = c.label .. " Custom Format",
-                getValue = function() return DBVal(fk) or "" end,
-                setValue = function(v)
-                    DB()[fk] = (v ~= "" and v) or nil
-                    ns.RefreshAllSettings(); UpdatePreview()
-                end,
-            })
+        if DBVal(c.key) == "custom" or type(DBVal(fk)) == "string" then
+            EllesmereUI.TextTags.AddFormatAccessor(rgn, c.label,
+                function() return DBVal(fk) end,
+                function(v) DB()[fk] = v; ns.RefreshAllSettings(); UpdatePreview() end)
         end
         if optState._npNotifySlot == c.key then
             optState._npNotifySlot = nil

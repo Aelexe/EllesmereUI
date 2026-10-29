@@ -2064,7 +2064,7 @@ function ns.UFO_BuildBuffsDebuffsSection(parent, y, ctx)
                     end,
                     function(k, v, neg)
                         if k == HIDE_EXH_KEY then
-                            ps.debuffHideExhaustion = (not v) and false or nil
+                            if v then ps.debuffHideExhaustion = nil else ps.debuffHideExhaustion = false end
                             ReloadAndUpdate()
                             EllesmereUI:RefreshPage()
                             return

@@ -756,6 +756,8 @@ PF.Geometry = function(ctx)
     end
     w = PixelSnap(math.max(10, w + (v.extraWidth or 0)))
     h = PixelSnap(math.max(10, h + (v.extraHeight or 0)))
+    -- Same grid as FB.FreePin: the pet header's own scale.
+    sp = EllesmereUI.PP.SnapForES(sp, (PF.container or UIParent):GetEffectiveScale())
     return w, h, sp, unitGrowth, groupGrowth
 end
 
@@ -1104,7 +1106,7 @@ end
 
 PF.FreeAnchor = function(c, set)
     local corner, x, y = PF.FreeCorner(set, PF.Ctx())
-    FB.Pin(c, corner, UIParent, "CENTER", x, y)
+    FB.FreePin(c, corner, x, y)
     return true
 end
 
@@ -1124,7 +1126,7 @@ end
 PF.PlaceMover = function(m, set)
     local corner, x, y, w, h = PF.FreeCorner(set, PF.moverCtx or PF.Ctx())
     m:SetSize(w, h)
-    m:SetPoint(corner, UIParent, "CENTER", x, y)
+    FB.FreePin(m, corner, x, y)
 end
 
 PF.SaveFreeRect = function(mover)

@@ -2085,11 +2085,16 @@ local function BuildCDMLivePreview(parent, yOff)
             end
             local fkFS = self._focusKickInfoText
             -- Wording must track the "Show on Target" toggle -- otherwise this text keeps promising focus-tracking even when the bar is configured to follow the current target instead.
+            local fkMain
             if bd.focusKickUseTarget then
-                fkFS:SetText(EllesmereUI.L("This bar will always be attached to your current target's nameplate"))
+                fkMain = EllesmereUI.L("This bar will always be attached to your current target's nameplate")
             else
-                fkFS:SetText(EllesmereUI.L("This bar will always be attached to your focus target's nameplate"))
+                fkMain = EllesmereUI.L("This bar will always be attached to your focus target's nameplate")
             end
+            -- Second, dimmer line: points sound-only users at the setup that needs no icon.
+            fkFS:SetText(fkMain .. "\n" .. EllesmereUI.COLOR_CODES.DIM
+                .. EllesmereUI.L("Want only the cast sound? Leave this bar empty and set Interrupt Spell below.")
+                .. "|r")
             fkFS:ClearAllPoints()
             fkFS:SetPoint("TOP", self, "TOPLEFT", self:GetWidth() / 2, -(totalH + 14))
             fkFS:SetWidth(self:GetWidth() - 20)
