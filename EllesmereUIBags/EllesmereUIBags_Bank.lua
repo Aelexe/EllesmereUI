@@ -2092,6 +2092,7 @@ local _bankListGripCfg = setmetatable({
 -- inset and the bag bar lays out again
 ns.OnSlotMetrics(function(m)
     _bankGripCfg.step = m[1] + m[2]
+    _bankGripCfg.minCols = math.max(1, math.ceil(8 * 38 / (m[1] + m[2])))
     rawset(_bankListGripCfg, "relayoutStep", m[1] + m[2])
     EUI_Bank._compactCols, EUI_Bank._compactW = nil, nil
     for _, f in pairs(_bankHeaders) do

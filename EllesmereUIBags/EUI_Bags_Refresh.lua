@@ -442,6 +442,7 @@ local _bagListGripCfg = setmetatable({
 -- window and bag bar lay out again (the main refresh does the rest)
 ns.OnSlotMetrics(function(m)
     _bagGripCfg.step = m[1] + m[2]
+    _bagGripCfg.minCols = math.max(1, math.ceil(8 * 38 / (m[1] + m[2])))
     rawset(_bagListGripCfg, "relayoutStep", m[1] + m[2])
     EUI_Bags._compactCols, EUI_Bags._compactW = nil, nil
     EUI_Bags._asCols, EUI_Bags._asMaxGridW, EUI_Bags._asMaxH = nil, nil, nil
