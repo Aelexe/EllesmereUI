@@ -167,7 +167,7 @@ local function OnPreClick(self, button, down)
         end
         -- Ahead of the open, which paints the pick, and of the snippet, which
         -- fires it.
-        RerollHearth()
+        RerollHearth(self)
         ns.Open(self._palette)
         return
     end
@@ -325,25 +325,26 @@ local function PushCell(btn, i, slot, p)
     end
 end
 
--- A new Random Hearthstone for this open, written onto every cell of every
--- button that holds one -- the pick is shared, and a button left on the old
--- one would fire a different toy than its palette draws. Out of combat only,
--- like every insecure write here, so a menu opened mid-fight keeps the last
--- roll -- still a working hearthstone, just the same one as before.
-RerollHearth = function()
-    if InCombatLockdown() then return end
-    local any = false
-    for _, btn in pairs(secureButtons) do
-        if btn._hearthCells and next(btn._hearthCells) then any = true break end
-    end
-    if not any then return end
+-- A new Random Hearthstone when the menu being opened holds one (a nest's
+-- cells are pushed onto its parent's button, so they count), written onto
+-- every cell of every button that holds one -- the pick is shared, and a
+-- button left on the old one would fire a different toy than its palette
+-- draws. Out of combat only, like every insecure write here, so a menu opened
+-- mid-fight keeps the last roll -- still a working hearthstone, just the same
+-- one as before.
+RerollHearth = function(pressed)
+    local own = pressed._hearthCells
+    if not (own and next(own)) or InCombatLockdown() then return end
     I.Hearth.Roll()
     for _, btn in pairs(secureButtons) do
-        for i, slot in pairs(btn._hearthCells or {}) do
-            local aType, aKey, aVal = ResolveAction(slot)
-            btn:SetAttribute("eqdT" .. i, aType)
-            btn:SetAttribute("eqdK" .. i, aKey)
-            btn:SetAttribute("eqdV" .. i, aVal)
+        local cells = btn._hearthCells
+        if cells then
+            for i, slot in pairs(cells) do
+                local aType, aKey, aVal = ResolveAction(slot)
+                btn:SetAttribute("eqdT" .. i, aType)
+                btn:SetAttribute("eqdK" .. i, aKey)
+                btn:SetAttribute("eqdV" .. i, aVal)
+            end
         end
     end
 end

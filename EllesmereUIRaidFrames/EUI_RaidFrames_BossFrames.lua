@@ -153,6 +153,8 @@ end
 FB.ShouldBeActive = function()
     local fb = FB.Settings()
     if not fb then return false end
+    -- Arena never has friendly bosses; an empty group there only takes room beside the party frames.
+    if ns._InArena() then return false end
     if fb.display == "always" then return true end
     if fb.display == "healers" then
         -- WoW Forever: a class that can heal counts as its healing spec.
@@ -535,7 +537,10 @@ FB.Pitch = function(fbset, s)
         local party = (not IsInRaid() or ns._PartyInRaid()) and fbset.showInDungeons == true
         if ns.RF_CompactOn(db.profile, party) then return ns.RF_OnePixel(party) end
     end
-    return s.cellSpacing or -1
+    -- Same grid as FB.FreePin: the boss container's own scale.
+    local c = FB.container
+    return EllesmereUI.PP.SnapForES(s.cellSpacing or -1,
+        (c or UIParent):GetEffectiveScale())
 end
 
 -- Re-apply all setting-derived properties (size, slots, texture, fonts, text anchors). OOC only;
@@ -633,6 +638,30 @@ FB.Pin = function(c, point, rel, relPoint, x, y)
     end
     c:ClearAllPoints()
     c:SetPoint(point, rel, relPoint, x, y)
+end
+
+-- Free Move pin off UIParent's centre. The saved offsets are raw mover geometry and the centre
+-- itself can sit on a half pixel (odd physical size), so snap the pinned point's absolute
+-- position at the container's own scale, or every border inside it blurs. A CENTER pin snaps
+-- with the container's size so odd-pixel dimensions still put both edges on whole pixels.
+FB.FreePin = function(c, point, x, y)
+    local P = EllesmereUI.PP
+    local ux, uy = UIParent:GetCenter()
+    if P and P.SnapForES and ux then
+        local es = c:GetEffectiveScale()
+        if point == "CENTER" then
+            -- A secret size falls back to the even (whole-pixel) centre.
+            local w, h = c:GetWidth(), c:GetHeight()
+            if issecretvalue(w) then w = nil end
+            if issecretvalue(h) then h = nil end
+            x = P.SnapCenterForDim(ux + x, w, es) - ux
+            y = P.SnapCenterForDim(uy + y, h, es) - uy
+        else
+            x = P.SnapForES(ux + x, es) - ux
+            y = P.SnapForES(uy + y, es) - uy
+        end
+    end
+    FB.Pin(c, point, UIParent, "CENTER", x, y)
 end
 
 -- Position the container per the position setting. The container inherits protection from its
@@ -808,7 +837,7 @@ FB.Anchor = function(owner)
     -- Owner-specific free anchoring (Extra Frames pins the grid's growth corner so the group grows away from it); CENTER pin otherwise.
     if owner.FreeAnchor and owner.FreeAnchor(c, fb) then return end
     local p = fb.freePos or {}
-    FB.Pin(c, "CENTER", UIParent, "CENTER", p.x or 100, p.y or 0)
+    FB.FreePin(c, "CENTER", p.x or 100, p.y or 0)
 end
 
 -- Re-anchor only (no restyle): the party visibility pass calls this on the party container's
@@ -846,6 +875,7 @@ function ns.FB_Apply()
         if FB.mover then FB.mover:Hide() end
         FB.rangeSpell = nil
         FB.UpdateRangeTicker()
+        FB.SyncGroupEvents(false)
         return
     end
 
@@ -853,6 +883,7 @@ function ns.FB_Apply()
     FB.ApplyStyle()
     FB.Anchor()
     FB.container:Show()
+    FB.SyncGroupEvents(true)
     -- Drivers feed the slot controller, which assigns bosses to the first slots in bossN order and shows/hides buttons securely.
     -- Group gate: raid only by default; raid OR party with Show in Dungeons on (the cog on
     -- Add Friendly Boss Group -- opt-in, so existing users keep raid-only behavior). Dungeon
@@ -1005,7 +1036,7 @@ FB.SetMoverShown = function(owner, show, frameName, labelText)
             owner.mover:SetPoint("CENTER", owner.container, "CENTER")
         else
             local p = oset.freePos or {}
-            owner.mover:SetPoint("CENTER", UIParent, "CENTER", p.x or 100, p.y or 0)
+            FB.FreePin(owner.mover, "CENTER", p.x or 100, p.y or 0)
         end
     end
     owner.mover:Show()
@@ -1016,17 +1047,37 @@ function ns.FB_SetMoverShown(show)
 end
 
 -- Standing event frame: exists even while inactive so a spec change can activate display="healers" without a /reload.
+-- The engage, target and roster listeners run only while the group is up (FB.SyncGroupEvents, from FB_Apply).
 do
     local ev = ns.TakeShell()
     ev:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
     ev:RegisterEvent("PLAYER_REGEN_ENABLED")
-    ev:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT")
-    ev:RegisterEvent("GROUP_ROSTER_UPDATE")
-    ev:RegisterEvent("PLAYER_TARGET_CHANGED")
+    ev:RegisterEvent("PLAYER_ENTERING_WORLD")
+    FB.SyncGroupEvents = function(on)
+        if FB.groupEv == on then return end
+        FB.groupEv = on
+        if on then
+            ev:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT")
+            ev:RegisterEvent("GROUP_ROSTER_UPDATE")
+            ev:RegisterEvent("PLAYER_TARGET_CHANGED")
+        else
+            ev:UnregisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT")
+            ev:UnregisterEvent("GROUP_ROSTER_UPDATE")
+            ev:UnregisterEvent("PLAYER_TARGET_CHANGED")
+        end
+    end
     ev:SetScript("OnEvent", function(_, event)
         if not db then return end
         if event == "PLAYER_SPECIALIZATION_CHANGED" then
             ns.FB_Apply()
+        elseif event == "PLAYER_ENTERING_WORLD" then
+            -- Entering or leaving an arena flips FB.ShouldBeActive; the raid frames' zone-in pass
+            -- re-applies only while they are on screen, which they never are in arena.
+            local arena = ns._InArena()
+            if arena ~= (FB.inArena == true) then
+                FB.inArena = arena
+                ns.FB_Apply()
+            end
         elseif event == "PLAYER_REGEN_ENABLED" then
             if FB.applyDirty then FB.applyDirty = nil; ns.FB_Apply() end
             if FB.anchorDirty then FB.anchorDirty = nil; FB.Anchor() end

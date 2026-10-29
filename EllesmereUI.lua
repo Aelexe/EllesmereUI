@@ -819,6 +819,7 @@ EllesmereUI.FOREVER_ONLY_ADDONS = {
 -- drop it here and drop the hold line from both TOCs.
 EllesmereUI.HELD_BACK_ADDONS = {
     EllesmereUILoadoutManager = true,
+    EllesmereUISimpleLootCouncil = true,
 }
 -- The set the running client leaves out.
 do

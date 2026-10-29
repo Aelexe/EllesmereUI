@@ -968,8 +968,9 @@ function NameplateFrame:SetUnit(unit, nameplate)
     -- Attach a pooled aura-container bundle for this unit.
     if ns.NPC_AttachPlate then ns.NPC_AttachPlate(self, unit) end
     if ns.DebuffColors_Attach then ns.DebuffColors_Attach(self, unit) end
-    -- Non-Target Opacity (zero cost while off: one numeric compare).
-    if ns._ntAlpha < 1 then ns.NT_Apply(self) end
+    -- Non-Target and Out of Combat Opacity (zero cost while off: numeric compares).
+    if ns._oocAlpha < 1 then self:RegisterUnitEvent("UNIT_FLAGS", unit) end
+    if ns._ntAlpha < 1 or ns._oocAlpha < 1 then ns.NT_Apply(self) end
     -- Execute glow is per-spawn state, not appearance: ApplyAppearance is generation-cached
     -- (skipped on recycled plates) and the threshold watcher only reaches plates active at flip
     -- time, so a plate pooled during a no-execute window would return glowless. Re-assert.

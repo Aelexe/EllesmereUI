@@ -47,6 +47,7 @@ EllesmereUI_GoldLedger.lua
 # Shared EllesmereUI Files
 EllesmereUI_PixelPerfect.lua
 EllesmereUI.lua
+EllesmereUI_AbsorbGlow.lua
 EllesmereUI_Panel.lua
 EllesmereUI_VisibilityRules.lua
 EllesmereUI_SharedHelpers.lua

@@ -608,6 +608,13 @@ local function PreSkinCharacterSheet()
             self:SetScript("OnUpdate", nil)
         end)
 
+        -- SetUnit loads asynchronously and the widget drops its camera while hidden; recentre once the model is in.
+        myModel:SetScript("OnModelLoaded", function(self)
+            self:RefreshCamera()
+            self:SetPortraitZoom(zoomLevel)
+            self:SetPosition(0, 0, 0)
+        end)
+
         mouseOverlay:SetScript("OnMouseWheel", function(_, delta)
             zoomLevel = math.max(0, math.min(1, zoomLevel + delta * ZOOM_STEP))
             myModel:SetPortraitZoom(zoomLevel)

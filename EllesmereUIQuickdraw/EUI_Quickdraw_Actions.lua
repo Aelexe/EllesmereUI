@@ -188,12 +188,13 @@ end
 -------------------------------------------------------------------------------
 --  Random Hearthstone
 --
---  One entry that is a different owned hearthstone toy on every open. The pick
---  is shared by every Random Hearthstone cell on every palette, so whatever a
---  cell draws is what its pushed attributes fire. Rolled again by the press
---  (RerollHearth in EUI_Quickdraw_Runtime.lua), which also rewrites those
---  cells' attributes -- out of combat only, since combat refuses the writes,
---  so a menu opened mid-fight keeps the last roll.
+--  One entry that is a different owned hearthstone toy each time a menu
+--  holding it opens. The pick is shared by every Random Hearthstone cell on
+--  every palette, so whatever a cell draws is what its pushed attributes fire.
+--  Rolled again by the press of such a menu's key (RerollHearth in
+--  EUI_Quickdraw_Runtime.lua), which also rewrites every such cell's
+--  attributes -- out of combat only, since combat refuses the writes, so a
+--  menu opened mid-fight keeps the last roll.
 --
 --  The roll is the portal flyout's own (EllesmereUI.ResolveHearthSlot), so
 --  the two agree on what counts: a random owned toy, or the plain Hearthstone
@@ -206,8 +207,8 @@ local Hearth = {}
 do
 local pickKind, pickID
 
--- A new pick. One second roll when the first lands on the toy just used, so
--- a collection of any size rarely repeats.
+-- A new pick, rolled once more when the first repeats the last pick, so two
+-- opens in a row rarely draw the same toy.
 function Hearth.Roll()
     local lastID = pickID
     local kind, id = EllesmereUI.ResolveHearthSlot(true)
