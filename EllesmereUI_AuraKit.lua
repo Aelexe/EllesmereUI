@@ -89,23 +89,20 @@ local function BuildRuleDurationFormatter(withSecondsUnit, preciseThreshold)
     local points = {
         { threshold = 0,     format = withSecondsUnit and "%ds" or "%d",  step = 1, rounding = Down },
         -- 90 second boundary catcher.
-        -- To follow Blizzard's format, seconds begin displaying with 90 seconds remaining.
-        -- Currently, the tooltip rounds Up  until 60 seconds remain, whereas it rounds
-        -- down everywhere else. To match Blizzard, using a ceiling until 90 seconds
-        -- will be most accurate. Additionally, steps use 60, 3600, and 86400 so
-        -- rounding applies to the minute, hour, and day, respectively, rather than
-        -- just the second.
+        -- To follow Blizzard's format, hours switch to minutes when 90 minutes remain,
+        -- and minutes switch to seconds when 90 seconds remain. To match Blizzard, 
+        -- using a ceiling until 90 seconds will be most accurate. Additionally, steps 
+        -- use 60, 3600, and 86400 so rounding applies to the minute, hour, and day, 
+        -- respectively, rather than just the second. 1 is added to each threshold so
+        -- so it accurately displays 90s, 60m, and 24h.
 
-        -- Minute-boundary catcher (field report: text flashed "0" just under a minute).
-        -- Seconds round DOWN, so a raw value in (59, 60) can reach 59 and land at this
-        -- threshold; the old Down bucket here floored the raw back to 0 -> "0m" for a
-        -- moment. Up in this one-second band yields exactly 1 -> "1m". The Up  bucket
-        -- resumes at 91, so every later reading keeps the legacy ceiling text unchanged
-        -- ("2m" until 91, "1h" until 59). Up never rounds ACROSS a threshold,
-        -- so no other unit boundary has this collision.
+        -- Seconds round DOWN, so a raw value in (91, 90) can reach 90 and land at this
+        -- threshold; The Up bucket resumes at 91, so every later reading keeps the 
+        -- ceiling text unchanged ("2m" until 90s, "2h" until 9m). Up never rounds ACROSS 
+        -- a threshold, so no other unit boundary has this collision.
         { threshold = 91,    format = "%dm", step = 60,    rounding = Up,  components = { { div = 60 } } },
-        { threshold = 3600,  format = "%dh", step = 3600,  rounding = Up,  components = { { div = 3600 } } },
-        { threshold = 86400, format = "%dd", step = 86400, rounding = Up,  components = { { div = 86400 } } },
+        { threshold = 5401,  format = "%dh", step = 3600,  rounding = Up,  components = { { div = 3600 } } },
+        { threshold = 86401, format = "%dd", step = 86400, rounding = Up,  components = { { div = 86400 } } },
     }
     -- > 60, not > 0: with the threshold at exactly one minute the m:ss band is
     -- empty and the table would carry duplicate 60-thresholds -- the standard
@@ -114,17 +111,18 @@ local function BuildRuleDurationFormatter(withSecondsUnit, preciseThreshold)
         -- Below the selected threshold, a clock-style value such as 5:23;
         -- under a minute plain seconds ("45", or "45s" with the unit on),
         -- matching the standard formatter's sub-minute look. The 60-band
-        -- catcher mirrors the stock table's: seconds round DOWN, so a raw value
-        -- in (59, 60) reaches 59 and would land as exactly 59, not wrap.
+        -- catcher aligns with the stock table's at a similar duration: 
+        -- seconds round DOWN, so a raw value in (59, 60) reaches 59 and 
+        -- while a raw value in (60, 61) would land as exactly 1:00.
         points = {
             { threshold = 0, format = withSecondsUnit and "%ds" or "%d", step = 1, rounding = Down },
             { threshold = 60, format = "%d:%02d", step = 1, rounding = Down,
                 components = { { div = 60 }, { mod = 60 } } },
             { threshold = preciseThreshold, format = "%dm", step = 60, rounding = Up,
                 components = { { div = 60 } } },
-            { threshold = 3600, format = "%dh", step = 3600, rounding = Up,
+            { threshold = 5401, format = "%dh", step = 3600, rounding = Up,
                 components = { { div = 3600 } } },
-            { threshold = 86400, format = "%dd", step = 86400, rounding = Up,
+            { threshold = 86401, format = "%dd", step = 86400, rounding = Up,
                 components = { { div = 86400 } } },
         }
     end
