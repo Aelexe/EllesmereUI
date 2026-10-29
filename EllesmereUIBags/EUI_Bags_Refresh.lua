@@ -518,6 +518,8 @@ local function FinishRefresh(curY, gridContentW, sidebarW, totalCount, numEmpty,
     -- View may have changed under a held item (catch layer on / off)
     if EUI_Bags._syncDropTarget and GetCursorInfo() == "item" then EUI_Bags._syncDropTarget() end
     ns.UpdateResizeGrip(EUI_Bags, EUI_Bags.IsListMode() and _bagListGripCfg or _bagGripCfg)
+    -- the offline bank panel goes over the items (bank picked, or an alt)
+    if ns.OfflinePanel then ns.OfflinePanel(sidebarW) end
 end
 
 function EUI_Bags:RefreshInventory()
@@ -715,6 +717,12 @@ function EUI_Bags:RefreshInventory()
         categoryCounts[recentCatIdx] = recentCount
     end
 
+    -- 2c. viewing an alt: the sidebar counts their bags instead
+    local altView = ns.OfflineAlt and ns.OfflineAlt()
+    if altView then categoryCounts, totalCount = ns.OfflineCounts() end
+    -- an alt or the offline bank view: its panel takes the item area
+    local offlineUp = altView or (selectedCategoryIndex == ns.OFFLINE_BANK_VIEW and ns.Offline.Enabled())
+
     -- 3. Update sidebar
     BuildSidebarButtons(categoryCounts, totalCount)
 
@@ -753,7 +761,9 @@ function EUI_Bags:RefreshInventory()
     local displayItems = {}
     for _, data in ipairs(tempItems) do
         local show = true
-        if isRecentView then
+        if offlineUp then
+            show = false  -- the offline panel covers these
+        elseif isRecentView then
             show = data.info and data.info.itemID and EUI_Bags._recentItems and EUI_Bags._recentItems[data.info.itemID]
         elseif isPinnedView then
             show = data.info and data.info.itemID and pinnedSet and IsItemPinned(pinnedSet, data.itemLink, data.info.itemID)
@@ -916,6 +926,10 @@ function EUI_Bags:RefreshInventory()
     -- (slot views and an unmerged list never reach MergeDuplicates)
     SetPaintedPanelOpen(_anyItemPanelOpen)
 
+    -- no live items laid out under the offline panel (select modes would hit them)
+    local liveItems, liveEmpty = tempItems, emptySlots
+    if offlineUp then liveItems, liveEmpty = {}, {} end
+
     -- List display (latched per session): rows replace the grid; the column
     -- header bar takes the top of the scroll area
     if EUI_Bags.IsListMode() and sf then
@@ -932,7 +946,7 @@ function EUI_Bags:RefreshInventory()
             -- The Recent Items tab: its items in one newest-first section
             recentOnly = isRecentView or nil,
             -- Empty rows only when nothing is search-filtered out
-            emptySlots = (#displayItems == #tempItems) and emptySlots or nil,
+            emptySlots = (#displayItems == #liveItems) and liveEmpty or nil,
             -- Same rule as the grid's Pinned Items section
             pinned = (showPinned and (isAllItems or (selectedCategoryIndex < 0 and BP().bagPinnedInOneBag ~= false)))
                 and pinnedSet or nil,
@@ -942,7 +956,7 @@ function EUI_Bags:RefreshInventory()
         return
     end
 
-    local curY = ns.RenderGridView(tempItems, displayItems, emptySlots, child, columns, gridW, gridPadX, showPinned, pinnedSet)
+    local curY = ns.RenderGridView(liveItems, displayItems, liveEmpty, child, columns, gridW, gridPadX, showPinned, pinnedSet)
 
     -- Compact: the window drops the remainder its widest band leaves short of
     -- the columns, less than a cell (ns.CompactBagsContentW). While open it

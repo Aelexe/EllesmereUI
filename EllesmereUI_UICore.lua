@@ -897,6 +897,39 @@ local function CtxBox(row, fontPath, outline)
     return box
 end
 
+-- the x on a row with onRemove: its own button, so the row's click still picks
+local function CtxRemove(row)
+    local rm = row._rm
+    if not rm then
+        rm = CreateFrame("Button", nil, row)
+        rm:SetSize(16, 16)
+        rm:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        rm:SetFrameLevel(row:GetFrameLevel() + 2)
+        rm.icon = rm:CreateTexture(nil, "OVERLAY")
+        rm.icon:SetAllPoints()
+        rm.icon:SetTexture("Interface\\AddOns\\EllesmereUI\\media\\icons\\eui-close.png")
+        rm.icon:SetAlpha(0.45)
+        rm:SetScript("OnEnter", function(self)
+            self.icon:SetAlpha(1)
+            local tip = self:GetParent()._item.removeTip
+            if tip then EllesmereUI.ShowWidgetTooltip(self, tip) end
+        end)
+        rm:SetScript("OnLeave", function(self)
+            self.icon:SetAlpha(0.45)
+            EllesmereUI.HideWidgetTooltip()
+        end)
+        rm:SetScript("OnClick", function(self)
+            local r = self:GetParent()
+            local fn = r._item.onRemove
+            EllesmereUI.HideWidgetTooltip()
+            CtxRoot(r._panel):Hide()
+            fn()
+        end)
+        row._rm = rm
+    end
+    return rm
+end
+
 local function CtxIcon(row)
     local icon = row._icon
     if not icon then
@@ -939,6 +972,7 @@ local function CtxLayout(panel, items, minW, fontKey)
         if type(item) == "table" then
             mfs:SetText(item.noLoc and item.text or L(item.text or ""))
             local w = mfs:GetStringWidth() or 0
+            if item.onRemove then w = w + 20 end
             if w > widest then widest = w end
             if item.icon then iconW = 22 end
         end
@@ -969,6 +1003,7 @@ local function CtxLayout(panel, items, minW, fontKey)
         if row._arrow then row._arrow:Hide() end
         if row._box then row._box:Hide() end
         if row._icon then row._icon:Hide() end
+        if row._rm then row._rm:Hide() end
         -- The label starts past the item's icon.
         lbl:SetPoint("LEFT", row, "LEFT", look.left + ((type(item) == "table" and item.icon) and 22 or 0), 0)
         local h = look.rowH
@@ -1008,6 +1043,7 @@ local function CtxLayout(panel, items, minW, fontKey)
                 else
                     CtxPaint(row, item.isActive)
                 end
+                if item.onRemove and not disabled then CtxRemove(row):Show() end
             end
         end
         row:SetSize(width - pad * 2, h)
