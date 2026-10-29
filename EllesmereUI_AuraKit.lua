@@ -98,7 +98,7 @@ local function BuildRuleDurationFormatter(withSecondsUnit, preciseThreshold)
 
         -- Seconds round DOWN, so a raw value in (91, 90) can reach 90 and land at this
         -- threshold; The Up bucket resumes at 91, so every later reading keeps the 
-        -- ceiling text unchanged ("2m" until 90s, "2h" until 9m). Up never rounds ACROSS 
+        -- ceiling text unchanged ("2m" until 90s, "2h" until 90m). Up never rounds ACROSS 
         -- a threshold, so no other unit boundary has this collision.
         { threshold = 91,    format = "%dm", step = 60,    rounding = Up,  components = { { div = 60 } } },
         { threshold = 5401,  format = "%dh", step = 3600,  rounding = Up,  components = { { div = 3600 } } },
