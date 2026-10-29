@@ -42,7 +42,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --   - Context Menu            -> '우클릭 메뉴' ('문맥 메뉴' 직역 주의)
 --   - Pull / Pull Timer       -> '풀링' / '풀링 초읽기' (전투 개시/초읽기. '당기기', '카운트다운' 음차 주의)
 --   - Charge vs. Stack        -> '충전' vs '중첩' (스킬 사용 횟수는 '충전', 효과 누적 수는 '중첩'으로 구분)
---   - Council / Loot Council  -> '분배 담당자' / '전리품 분배 위원회' (한와 실사용 용어 준수. '위원', '평의회' 직역 지양)
+--   - Council / Loot Council  -> '위원회' / '전리품 분배 위원회' ('평의회' 직역 지양, Loot Master '분배 담당자'와 구분)
 --   - Orb Carrier             -> '구슬 운반자' (코트모구의 사원 힘의 구슬 운반자 공식 명칭. '오브 운반자' 지양)
 --
 -- 5. 기능 및 UI 조작 표준 표현
@@ -10737,7 +10737,7 @@ L["Show Spell Rank"] = "주문 등급 표시"
 L["Simple Loot Council"] = "Simple Loot Council"
 L["OLDER STANDALONE ADDON"] = "이전 버전 독립 실행형 애드온"
 L["An older SimpleLootCouncil addon is enabled, so the Simple Loot Council module is off until that addon is disabled or updated."] = "이전 버전의 SimpleLootCouncil 애드온이 켜져 있어, 해당 애드온을 비활성화하거나 업데이트할 때까지 Simple Loot Council 모듈이 꺼집니다."
-L["Council can manage queue"] = "분배 담당자의 대기열 관리 허용"
+L["Council can manage queue"] = "위원회의 대기열 관리 허용"
 L["SIMPLIFIED STATS"] = "간소화된 능력치"
 L["Active Stance"] = "현재 태세"
 L["ACTIVE STANCE, FORM, ASPECT & AURA"] = "활성 태세, 형상, 상 및 오라"
