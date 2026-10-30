@@ -642,22 +642,11 @@ end
 -- Button child Edit Mode shows on enter and hides on exit) gets the same
 -- in-place treatment: sizing belongs to our grip, and a live handle here
 -- would write Edit Mode's size store behind the size lane's back.
-local function SuppressEditModeChild(f)
-    if not f then return end
-    -- GetAlpha reads secret on chat-roleset widgets in lockdown; a secret
-    -- skips the compare and re-asserts.
-    local a = f:GetAlpha()
-    if (issecretvalue and issecretvalue(a)) or a ~= 0 then f:SetAlpha(0) end
-    if f.SetMouseClickEnabled then
-        if f:IsMouseClickEnabled() then f:SetMouseClickEnabled(false) end
-        if f:IsMouseMotionEnabled() then f:SetMouseMotionEnabled(false) end
-    end
-end
 function ECHAT.SuppressChatEditModeSelection()
     local cf1 = _G.ChatFrame1
     if not cf1 then return end
-    SuppressEditModeChild(cf1.Selection)
-    SuppressEditModeChild(cf1.EditModeResizeButton)
+    EllesmereUI.SetEditModeChildInert(cf1.Selection, true)
+    EllesmereUI.SetEditModeChildInert(cf1.EditModeResizeButton, true)
 end
 ns._CaptureChatPositionGenesis = CaptureChatPositionGenesis
 ns._GenesisSettle = GenesisSettle

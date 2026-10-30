@@ -1839,7 +1839,7 @@ local function RenderHeader(record)
     local kcol = C_ChallengeMode and C_ChallengeMode.GetKeystoneLevelRarityColor
         and C_ChallengeMode.GetKeystoneLevelRarityColor(record.level or 0)
     if type(kcol) == "table" and kcol.r then lvlHex = Hex(kcol.r, kcol.g, kcol.b) end
-    -- One string, keystone-rarity colour on the level only: "+12 The Rookery".
+    -- One string, keystone-rarity colour on the level only: "+12 Voidscar Arena".
     titleFS:SetText(format("|cff%s+%d|r %s", lvlHex, record.level or 0, record.mapName or "?"))
 
     local timeHex = record.onTime and "40ff40" or "ff6060"
@@ -2053,7 +2053,7 @@ function ns.RS_ShowPreview()
             class       = PREVIEW_CLASSES[i],
             role        = R and ((i == 1 and R.Tank) or (i == 2 and R.Healer) or R.Damage),
             specIcon    = PREVIEW_SPEC_ICON(i),
-            ilvl        = 668 + i * 3,
+            ilvl        = 316 + i * 3,
             score       = 2950 + i * 90,
             scoreGain   = (i ~= 3) and (6 + i * 3) or nil,
             damage      = 30000000 + i * 8000000,
@@ -2065,17 +2065,19 @@ function ns.RS_ShowPreview()
     end
     -- Same order the live panel gets from BuildMembers.
     SortMembers(members)
-    -- Resolve the dungeon name from its ID so the preview is localized by the
-    -- client. Out of season the API returns nothing and the English name shows;
-    -- it is not a translator key, so it is not wrapped in L().
+    -- SEASON UPDATE (cosmetic): the preview dungeon and its timer, as in the
+    -- Mythic+ Timer's PREVIEW_RUN, and the members' item levels above. Resolve
+    -- the dungeon name from its ID so the preview is localized by the client.
+    -- Out of season the API returns nothing and the English name shows; it is
+    -- not a translator key, so it is not wrapped in L().
     local mapName = C_ChallengeMode and C_ChallengeMode.GetMapUIInfo
-        and C_ChallengeMode.GetMapUIInfo(2648)
+        and C_ChallengeMode.GetMapUIInfo(585)
     ShowWindow({
-        mapID     = 2648,
-        mapName   = PlainString(mapName) or "The Rookery",
+        mapID     = 585,
+        mapName   = PlainString(mapName) or "Voidscar Arena",
         level     = 12,
         timeMS    = 1380000,
-        timeLimit = 1920,
+        timeLimit = 1800,
         onTime    = true,
         upgrades  = 2,
         deaths    = 3,

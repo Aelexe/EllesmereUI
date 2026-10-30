@@ -1454,14 +1454,16 @@ local function BuildVisualBars(parent, y, W, onSection, EYE)
     _, h = W:SectionHeader(parent, "TEXT DISPLAY", y); y = y - h
 
     y = ns.RFO_BuildTextDisplay(W, parent, y, { page = EllesmereUI._buildingPage, party = optState._partyCtx })
-    -- WoW Forever's Name Format also shapes the Top Name Bar, so it has a row of
-    -- its own, not a place on the Name tile.
-    if EllesmereUI.NAME_FORMAT_VALUES then
+    -- The Name Format also shapes the Top Name Bar, so it has a row of its own,
+    -- not a place on the Name tile. Raid Frames saves "full" (an unset party
+    -- key reads the raid's).
+    do
+        local function Set(v) SSet("nameFormat", v) end
+        local values, order, getValue = EllesmereUI.NameFormatMenu(
+            function() return SVal("nameFormat", "full") end, Set)
         _, h = W:DualRow(parent, y,
-            { type="dropdown", text="Name Format",
-              values=EllesmereUI.NAME_FORMAT_VALUES, order=EllesmereUI.NAME_FORMAT_ORDER,
-              getValue=function() return SVal("nameFormat", "full") end,
-              setValue=function(v) SSet("nameFormat", v) end },
+            { type="dropdown", text="Name Format", values=values, order=order,
+              getValue=getValue, setValue=Set },
             EllesmereUI.BlankRowCfg());  y = y - h
     end
     if onSection then onSection("textDisplay", _secY, y) end; _secY = y

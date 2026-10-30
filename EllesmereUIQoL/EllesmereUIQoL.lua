@@ -14,7 +14,7 @@ if EUI_CLIENT_BLOCKED then return end -- pre-12.1 client failsafe (EllesmereUI_C
 --  shared with Cursor/BattleRes/Bloodlust: each NewDB merges its own defaults
 --  into the SAME profile table, repointed by the profile system on swap.
 -------------------------------------------------------------------------------
-if not (EllesmereUI and EllesmereUI._ModuleNS and EllesmereUI.NewCombatQueue and EllesmereUI.SetFramePlacer) then EUI_CLIENT_BLOCKED = true; return end -- stale-parent guard: a partially updated install (old parent, new child) goes dormant via the line-1 failsafe instead of erroring (the Shifter's loot windows use the parent's frame placer)
+if not (EllesmereUI and EllesmereUI._ModuleNS and EllesmereUI.NewCombatQueue and EllesmereUI.SetFramePlacer and EllesmereUI.RAID_PREP_IDS) then EUI_CLIENT_BLOCKED = true; return end -- stale-parent guard: a partially updated install (old parent, new child) goes dormant via the line-1 failsafe instead of erroring (the Shifter's loot windows use the parent's frame placer; Raid Buff Check reads the parent's buff lists)
 local ns = select(2, ...)
 EllesmereUI._ModuleNS["EllesmereUIQoL"] = ns  -- LOD options files read this module ns via the registry
 ns.CombatQueue = EllesmereUI.NewCombatQueue(CreateFrame("Frame"))
@@ -2167,14 +2167,14 @@ end
 --  battle res) is left to the player unless the combat option is on.
 -------------------------------------------------------------------------------
 do
-    local issecret = issecretvalue or function() return false end
+    local IsSecret = EllesmereUI.IsSecret
     local frame
 
     -- A secret or unreadable answer counts as in combat.
     local function CasterInCombat(caster)
         if not caster then return false end
         local ok, v = pcall(UnitAffectingCombat, caster)
-        if not ok or issecret(v) then return true end
+        if not ok or IsSecret(v) then return true end
         return v and true or false
     end
 
@@ -3895,7 +3895,7 @@ end
 if not EllesmereUI.IS_FOREVER then
     local loader
     local applied = false
-    local mouseWas, wheelWas
+    local mouseWas
 
     function EllesmereUI._applyMapSidebars()
         local on = EllesmereUIDB and EllesmereUIDB.mapSidebarsClear == true
@@ -3922,15 +3922,14 @@ if not EllesmereUI.IS_FOREVER then
         if not (b and b.Blackout) then return end
         if on then
             if not applied then
-                mouseWas, wheelWas = b:IsMouseEnabled(), b:IsMouseWheelEnabled()
+                mouseWas = b:IsMouseEnabled()
             end
             b.Blackout:SetAlpha((EllesmereUIDB.mapSidebarsOpacity or 0) / 100)
+            -- The wheel already passes through: the frame never takes it.
             b:EnableMouse(false)
-            b:EnableMouseWheel(false)
         else
             b.Blackout:SetAlpha(1)
             b:EnableMouse(mouseWas)
-            b:EnableMouseWheel(wheelWas)
         end
         applied = on
     end

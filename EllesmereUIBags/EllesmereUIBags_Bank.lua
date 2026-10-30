@@ -2096,10 +2096,12 @@ local _bankGripCfg = {
     setLocked = function(v) BP().bankWindowLocked = v and true or false end,
 }
 
--- List View: free width in pixels (rows have no cell grid)
+-- List View: free width in pixels (rows have no cell grid). It keeps the
+-- default slot pitch: the slot sliders are for Grid and Compact
+local LIST_PITCH = 38
 local _bankListGripCfg = setmetatable({
-    step = 1, relayoutStep = SLOT_SIZE + SPACING, minCols = 300,
-    getCols = function() return BP().bankListWidth or GetBankColumns() * (SLOT_SIZE + SPACING) end,
+    step = 1, relayoutStep = LIST_PITCH, minCols = 300,
+    getCols = function() return BP().bankListWidth or GetBankColumns() * LIST_PITCH end,
     save = function(w, h)
         BP().bankListWidth, BP().bankHeight = w, h
         UpdateThumb()
@@ -2110,7 +2112,6 @@ local _bankListGripCfg = setmetatable({
 ns.OnSlotMetrics(function(m)
     _bankGripCfg.step = m[1] + m[2]
     _bankGripCfg.minCols = math.max(1, math.ceil(8 * 38 / (m[1] + m[2])))
-    rawset(_bankListGripCfg, "relayoutStep", m[1] + m[2])
     EUI_Bank._compactCols, EUI_Bank._compactW = nil, nil
     for _, f in pairs(_bankHeaders) do
         f._line:ClearAllPoints()
@@ -2162,8 +2163,8 @@ function EUI_Bank:RefreshBank()
     local gridPadX = 10
     local COLUMNS = GetBankColumns()
     local gridW = COLUMNS * (SLOT_SIZE + SPACING)
-    -- List rows take the grip-set width
-    if EUI_Bank.IsListMode() and BP().bankListWidth then gridW = BP().bankListWidth end
+    -- List rows take the grip-set width, by default the default pitch's
+    if EUI_Bank.IsListMode() then gridW = BP().bankListWidth or COLUMNS * LIST_PITCH end
     local startX = gridPadX + 5
 
     -- Set frame size BEFORE rendering so scroll frame has non-zero bounds
@@ -2806,7 +2807,13 @@ end
 --  drag to reorder categories: top-level rows move among themselves, group
 --  members only inside their group. same order the bags use.
 -------------------------------------------------------------------------------
+-- every tab divider the sidebar can show; a build hides them all first
+local SIDEBAR_DIVIDERS = { "_bankTabDivider", "_warbandDivider", "_warbandTabDivider", "_warbandViewDivider", "_buyDivider" }
+
 local _drag  -- { btn, scope, id, startY, live } while a drag is going
+-- moves at each drag start and each sidebar build: a row's block is worked out
+-- once per value (nothing reorders until the drop)
+local _dragGen = 0
 
 -- a row's selection, nil for the buy rows
 local function RowSel(btn) return not btn._isPurchaseTab and btn._catSel or nil end
@@ -2878,6 +2885,15 @@ local function DragVisuals(btn)
     dragLine:SetColorTexture(r, g, b, 1)
 end
 
+-- a row's block id + indices in the drag's scope, kept on the row for this _dragGen
+local function RowBlock(b)
+    if b._dragGen ~= _dragGen then
+        b._dragGen = _dragGen
+        b._dragId, b._dragBlock = DragBlock(RowSel(b), _drag.scope)
+    end
+    return b._dragId, b._dragBlock
+end
+
 -- where the drop lands: the block under the cursor, before or after it
 local function DragTarget()
     local over
@@ -2885,12 +2901,12 @@ local function DragTarget()
         if b:IsShown() and b:IsMouseOver() then over = b; break end
     end
     if not over then return nil end
-    local id, block = DragBlock(RowSel(over), _drag.scope)
+    local id, block = RowBlock(over)
     if not id or id == _drag.id then return nil end
     -- all of the block's rows (a group's header, members, details)
     local top, bottom
     for _, b in pairs(_sidebarBtns) do
-        if b:IsShown() and DragBlock(RowSel(b), _drag.scope) == id then
+        if b:IsShown() and RowBlock(b) == id then
             if not top or b:GetTop() > top:GetTop() then top = b end
             if not bottom or b:GetBottom() < bottom:GetBottom() then bottom = b end
         end
@@ -2927,7 +2943,7 @@ local function FinishDrag(apply)
     end
     local before = cats[insertAt]  -- nil: the end of the list
     -- keep the bags' selection on the same category, not the same index
-    local selIdx, selGroup = ns.GetSelection and ns.GetSelection()
+    local selIdx, selGroup = ns.GetSelection()
     local selKey = selIdx and selIdx > 0 and cats[selIdx] and cats[selIdx]._defaultName
     local function IndexOf(c) for i, x in ipairs(cats) do if x == c then return i end end end
     for _, c in ipairs(moving) do
@@ -2936,13 +2952,13 @@ local function FinishDrag(apply)
     end
     -- the sets catch up with their anchor on a rebuild from the saved order
     if sets then CM:OnEquipmentSetsChanged() end
-    if selKey and ns.SetSelection then
+    if selKey then
         for ci, c in ipairs(CM:GetCategories()) do
             if c._defaultName == selKey then ns.SetSelection(ci, selGroup); break end
         end
     end
     EUI_Bank:RefreshBank()
-    if _G.EUI_Bags and _G.EUI_Bags:IsVisible() and _G.EUI_Bags.RefreshInventory then _G.EUI_Bags:RefreshInventory() end
+    if EUI_Bags:IsVisible() then EUI_Bags:RefreshInventory() end
 end
 
 dragFrame:SetScript("OnUpdate", function()
@@ -2981,6 +2997,7 @@ local function BeginDrag(btn)
     if not scope then return end
     local _, y = GetCursorPosition()
     local sel = RowSel(btn)
+    _dragGen = _dragGen + 1
     _drag = { btn = btn, sel = sel, scope = scope, id = DragBlock(sel, scope), startY = y }
     dragFrame:Show()
 end
@@ -3253,20 +3270,11 @@ function BuildBankSidebar()
     -- bank and warbank views and the buy entries go last (an alt's bank draws
     -- the same way). off: the usual layout
     local nested = ns.Offline and ns.Offline.Enabled()
-    for _, k in ipairs({ "_bankTabDivider", "_warbandDivider", "_warbandTabDivider", "_warbandViewDivider", "_buyDivider" }) do
+    for _, k in ipairs(SIDEBAR_DIVIDERS) do
         if sidebarChild[k] then sidebarChild[k]:Hide() end
     end
-
-    -- tabs nested under their all entry
-    local function NestTabs(warband)
-        if not showTabs then return end
-        for ti, tab in ipairs(_allTabs) do
-            if (tab.isWarband == true) == warband then
-                RenderSidebarEntry(ti, tab.shortName or tab.name, tab.icon or (warband and 1542854 or 133652),
-                    tab._usedSlots, selView == ti, 1)
-            end
-        end
-    end
+    -- the rows may be handed to other entries: a drag works their blocks out again
+    _dragGen = _dragGen + 1
 
     local defaultOneBag = BankDefaultsToOne()
     local hasWarband = false
@@ -3274,6 +3282,16 @@ function BuildBankSidebar()
         if tab.isWarband then hasWarband = true; break end
     end
     if nested then
+        -- tabs nested under their all entry
+        local function NestTabs(warband)
+            if not showTabs then return end
+            for ti, tab in ipairs(_allTabs) do
+                if (tab.isWarband == true) == warband then
+                    RenderSidebarEntry(ti, tab.shortName or tab.name, tab.icon or (warband and 1542854 or 133652),
+                        tab._usedSlots, selView == ti, 1)
+                end
+            end
+        end
         if not _warbandOnly then
             local function All()
                 RenderSidebarEntry(0, EllesmereUI.L("All Bank Tabs"), 413587, charUsed, selView == 0)

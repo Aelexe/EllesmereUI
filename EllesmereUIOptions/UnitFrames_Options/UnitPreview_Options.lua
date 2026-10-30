@@ -471,9 +471,9 @@ function ns.UFO_BuildUnitPreview(parent, unitKey, side)
             -- The player's name as the live frame shows it (Forever surname).
             local n = (unitKey == "player") and (EllesmereUI.WithSurname(UnitName("player")) or "Player")
                 or (_previewCreatureNames[unitKey] or unitKey)
-            -- Name Format (WoW Forever only; nil on retail).
-            if EllesmereUI.ForeverShortName and prefix and s then
-                n = EllesmereUI.ForeverShortName(n, s[prefix .. "NameFormat"])
+            -- The slot's Name Format.
+            if prefix and s then
+                n = EllesmereUI.ShortName(n, s[prefix .. "NameFormat"])
             end
             return n
         end

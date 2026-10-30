@@ -1040,7 +1040,7 @@ do
     -- What each piece reads: "hp" health, "pp" power, "abs" / "habs" the two
     -- absorb amounts, "id" name or level only (identity events repaint those).
     -- A piece not listed (the target pieces and separators, the group number,
-    -- the WoW Forever name twins) makes its zone repaint on every value event.
+    -- the Name Format twins) makes its zone repaint on every value event.
     local PIECE_READS = {
         [P.perhp] = "hp", [P.perhpnosign] = "hp", [P.curhpshort] = "hp",
         [P.healthshort] = "hp", [P.maxhpshort] = "hp", [P.curhp] = "hp", [P.maxhp] = "hp",
@@ -1049,12 +1049,14 @@ do
         [P.healabsorb] = "habs", [P.healabsorbshort] = "habs",
         [P.name] = "id", [P.level] = "id", [P.levelcol] = "id", [P.levelcolall] = "id",
     }
+    -- The tags' Name Format modifiers ([name:abbr]): they shape the plain name,
+    -- whatever the slot's own Name Format says.
     local function Shaped(piece, mode)
         return function(unit)
-            return EllesmereUI.ForeverShortName(piece(unit), mode)
+            return EllesmereUI.ShortName(piece(unit), mode)
         end
     end
-    for _, mode in ipairs({ "first", "last", "abbr", "10", "15", "4" }) do
+    for _, mode in ipairs({ "first", "last", "abbr" }) do
         P["name" .. mode] = Shaped(P.name, mode)
         P["tgt" .. mode] = Shaped(P.tgtname, mode)
         PIECE_READS[P["name" .. mode]] = "id"
@@ -1070,10 +1072,8 @@ do
         ["pp:max:abr"] = P.maxpp, ["pp:pct"] = P.perpp,
         ["absorb"] = P.absorb, ["absorb:abr"] = P.absorbshort,
         ["healabsorb"] = P.healabsorb, ["healabsorb:abr"] = P.healabsorbshort,
-        ["name"] = P.name, ["name:first"] = P.namefirst, ["name:last"] = P.namelast,
-        ["name:abbr"] = P.nameabbr, ["name:10"] = P.name10, ["name:15"] = P.name15, ["name:4"] = P.name4,
-        ["target"] = P.tgtname, ["target:first"] = P.tgtfirst, ["target:last"] = P.tgtlast,
-        ["target:abbr"] = P.tgtabbr, ["target:10"] = P.tgt10, ["target:15"] = P.tgt15, ["target:4"] = P.tgt4,
+        ["name"] = P.name, ["name:first"] = P.namefirst, ["name:last"] = P.namelast, ["name:abbr"] = P.nameabbr,
+        ["target"] = P.tgtname, ["target:first"] = P.tgtfirst, ["target:last"] = P.tgtlast, ["target:abbr"] = P.tgtabbr,
         ["level"] = P.level, ["group"] = P.group,
     })
     ns.UF_TextTags = TAG_CATALOG
@@ -1131,30 +1131,28 @@ do
         return def[1], pieces, ZONE_IDENTITY[content] or nil
     end
 
-    -- Name Format (WoW Forever only): a slot set to First Name or Last Name
-    -- (<prefix>NameFormat) gets short-name twins of its name pieces when the
-    -- zone is applied, so the painter and every unset slot run as before.
-    -- Level, separator and colour pieces stay; Name > Target shortens both
-    -- names. ForeverShortName passes a secret name through whole and caches
-    -- the short forms, so a zone repainted on every health tick builds no
-    -- strings.
-    if EllesmereUI.ForeverShortName then
-        local short, nameFn, tgtFn = EllesmereUI.ForeverShortName, P.name, P.tgtname
-        local function Twins(mode)
-            return {
-                [nameFn] = function(u) return short(nameFn(u), mode) end,
-                [tgtFn]  = function(u) return short(tgtFn(u), mode) end,
-            }
-        end
-        local twinsByMode = {
-            first = Twins("first"), last = Twins("last"), abbr = Twins("abbr"),
-            ["10"] = Twins("10"), ["15"] = Twins("15"), ["4"] = Twins("4"),
-        }
+    -- Name Format: a slot set to one (<prefix>NameFormat) gets short-name twins
+    -- of its name pieces when the zone is applied, so the painter and every
+    -- unset slot run as before. Level, separator and colour pieces stay; Name >
+    -- Target shortens both names. ShortName passes a secret name through whole
+    -- and caches the short forms, so a zone repainted on every health tick
+    -- builds no strings. A mode's twins are made the first time a slot uses it.
+    do
+        local short, nameFn, tgtFn = EllesmereUI.ShortName, P.name, P.tgtname
+        local twinsByMode = {}
         local base = ns.ContentToZone
         function ns.ContentToZone(content, prefix, settings)
             local fmt, pieces, static = base(content, prefix, settings)
-            local twins = fmt and settings and twinsByMode[settings[prefix .. "NameFormat"]]
-            if twins then
+            local mode = fmt and settings and settings[prefix .. "NameFormat"]
+            if mode and EllesmereUI.IsNameFormat(mode) then
+                local twins = twinsByMode[mode]
+                if not twins then
+                    twins = {
+                        [nameFn] = function(u) return short(nameFn(u), mode) end,
+                        [tgtFn]  = function(u) return short(tgtFn(u), mode) end,
+                    }
+                    twinsByMode[mode] = twins
+                end
                 for i = 1, #pieces do pieces[i] = twins[pieces[i]] or pieces[i] end
             end
             return fmt, pieces, static

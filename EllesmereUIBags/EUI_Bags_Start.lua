@@ -803,6 +803,9 @@ local function StartAddon()
     end
     HookSendMail(_G.SendMailFrame)
 
+    -- The saved slot size before the pool is built (out of combat only): a first
+    -- bag open in combat could not resize the slots for the whole fight.
+    ns.ApplySlotMetrics()
     -- Pre-warm the secure item-button pool out of combat: a ContainerFrameItemButtonTemplate created
     -- in lockdown is tainted (UseContainerItem() blocked in M+/Delves), so build every button we could
     -- need up front and let RefreshInventory only position/show clean ones. Slots the loading-screen

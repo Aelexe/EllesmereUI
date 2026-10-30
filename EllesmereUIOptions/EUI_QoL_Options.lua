@@ -2711,6 +2711,10 @@ initFrame:SetScript("OnEvent", function(self)
                 EllesmereUIDB.targetDistanceOffsetY = nil
                 EllesmereUIDB.targetDistanceTextSize = nil
                 EllesmereUIDB.targetDistancePos = nil
+                EllesmereUIDB.mapSidebarsClear = nil
+                EllesmereUIDB.mapSidebarsOpacity = nil
+                EllesmereUIDB.autoAcceptRes = nil
+                EllesmereUIDB.autoAcceptResCombat = nil
                 if EllesmereUIDB.unlockAnchors then
                     EllesmereUIDB.unlockAnchors.EUI_TargetDistance = nil
                     EllesmereUIDB.unlockAnchors.EUI_CombatAlert = nil

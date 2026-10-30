@@ -433,7 +433,9 @@ end
 -- both refreshes call this first; a change made in combat waits for the next one
 function ns.ApplySlotMetrics()
     local p = BP()
-    local size, gap = p.bagSlotSize or 34, p.bagSlotSpacing or 4
+    -- the sliders' ranges: a hand-edited or imported 0 would divide by zero
+    local size = math.min(math.max(tonumber(p.bagSlotSize) or 34, 24), 56)
+    local gap = math.min(math.max(tonumber(p.bagSlotSpacing) or 4, 0), 12)
     if (size == SLOT_SIZE and gap == SPACING) or InCombatLockdown() then return end
     SLOT_SIZE, SPACING = size, gap
     ns.SLOT_SIZE, ns.SPACING = size, gap

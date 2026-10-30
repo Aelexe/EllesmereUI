@@ -202,15 +202,16 @@ initFrame:SetScript("OnEvent", function(self)
             -- slot size / spacing: the sliders fire every step while dragging,
             -- so the windows lay out once per frame at most
             local relayoutQueued = false
+            local function Relayout()
+                relayoutQueued = false
+                ResetAndRefreshBagLayout()
+                local bank = _G.EUI_BankFrame
+                if bank and bank:IsVisible() and bank.RefreshBank then bank:RefreshBank() end
+            end
             local function RelayoutSoon()
                 if relayoutQueued then return end
                 relayoutQueued = true
-                C_Timer.After(0, function()
-                    relayoutQueued = false
-                    ResetAndRefreshBagLayout()
-                    local bank = _G.EUI_BankFrame
-                    if bank and bank:IsVisible() and bank.RefreshBank then bank:RefreshBank() end
-                end)
+                C_Timer.After(0, Relayout)
             end
 
             local BagsNS = EllesmereUI._ModuleNS["EllesmereUIBags"]
@@ -224,6 +225,12 @@ initFrame:SetScript("OnEvent", function(self)
             local bagList = BagDisplayValue() == "list"
             local anyGrid = not bagList or db.profile.bankListView ~= true
             local anyList = bagList or db.profile.bankListView == true
+            -- Slot Size, Slot Spacing and Slot Background only draw in Grid and
+            -- Compact: they grey out while the bags and the bank both use List
+            local function NoSlotGrid()
+                return BagDisplayValue() == "list" and BagsNS.BankDisplayMode(db.profile) == "list"
+            end
+            local NO_SLOT_GRID = "This option requires the Grid or Compact display in the bags or the bank"
 
             ---------------------------------------------------------------------------
             --  LAYOUT
@@ -231,7 +238,8 @@ initFrame:SetScript("OnEvent", function(self)
             _, h = W:SectionHeader(parent, "LAYOUT", y); y = y - h
 
             -- Bag Style | Default Selected Bag | Window Scale | Frame Strata |
-            -- Auto-Size to Fit, two per row
+            -- Slot Size | Slot Spacing | Auto-Size to Fit (not in List) |
+            -- Background Color | Background Opacity | Slot Background, two per row
             local layoutSlots = {
                 { type="dropdown", text="Bag Style",
                   values = { grid="Grid", list="List", compact="Compact" },
@@ -290,6 +298,7 @@ initFrame:SetScript("OnEvent", function(self)
                   end },
                 { type="slider", text="Slot Size", min=24, max=56, step=1,
                   tooltip="Size of each item slot in bags and bank.",
+                  disabled=NoSlotGrid, disabledTooltip=NO_SLOT_GRID,
                   getValue=function() return db.profile.bagSlotSize or 34 end,
                   setValue=function(v)
                       db.profile.bagSlotSize = v
@@ -297,6 +306,7 @@ initFrame:SetScript("OnEvent", function(self)
                   end },
                 { type="slider", text="Slot Spacing", min=0, max=12, step=1,
                   tooltip="Space between item slots in bags and bank.",
+                  disabled=NoSlotGrid, disabledTooltip=NO_SLOT_GRID,
                   getValue=function() return db.profile.bagSlotSpacing or 4 end,
                   setValue=function(v)
                       db.profile.bagSlotSpacing = v
@@ -322,11 +332,6 @@ initFrame:SetScript("OnEvent", function(self)
                 if bags then BagsNS.ApplyWindowBackground(bags.bg, bags.bgOverlay) end
                 if bank then BagsNS.ApplyWindowBackground(bank._bg, bank._bgOverlay) end
             end
-            local function RefreshWindows()
-                if _G.EUI_Bags and _G.EUI_Bags:IsVisible() and _G.EUI_Bags.RefreshInventory then _G.EUI_Bags:RefreshInventory() end
-                local bank = _G.EUI_BankFrame
-                if bank and bank:IsVisible() and bank.RefreshBank then bank:RefreshBank() end
-            end
             layoutSlots[#layoutSlots + 1] = { type="colorpicker", text="Background Color", hasAlpha=true,
                 tooltip="The tint over the bag and bank window backgrounds. Its opacity sets how strong the tint is.",
                 getValue=function()
@@ -347,6 +352,7 @@ initFrame:SetScript("OnEvent", function(self)
                 end }
             layoutSlots[#layoutSlots + 1] = { type="colorpicker", text="Slot Background", hasAlpha=true,
                 tooltip="The color and opacity of empty item slots in the bags and bank.",
+                disabled=NoSlotGrid, disabledTooltip=NO_SLOT_GRID,
                 getValue=function()
                     local c = db.profile.bagSlotBgColor
                     if c then return c.r, c.g, c.b, c.a or 1 end
@@ -355,7 +361,7 @@ initFrame:SetScript("OnEvent", function(self)
                 setValue=function(r, g, b, a)
                     db.profile.bagSlotBgColor = { r = r, g = g, b = b, a = a }
                     -- the picker fires every frame while dragging: retint, don't re-lay out
-                    if BagsNS and BagsNS.RetintSlotBackgrounds then BagsNS.RetintSlotBackgrounds() else RefreshWindows() end
+                    BagsNS.RetintSlotBackgrounds()
                 end }
             for i = 1, #layoutSlots, 2 do
                 _, h = W:DualRow(parent, y, layoutSlots[i], layoutSlots[i + 1] or EllesmereUI.BlankRowCfg()); y = y - h

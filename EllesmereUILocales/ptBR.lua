@@ -304,6 +304,8 @@ L["Backpack"] = "Mochila"
 L["Bag %d"] = "Bolsa %d"
 L["Bands"] = "Faixas"
 L["Bank"] = "Banco"
+L["Bags %1$d"] = "Bolsas %1$d"
+L["Bank %1$d"] = "Banco %1$d"
 L["Bar %d"] = "Barra %d"
 L["Blacklisted spells never display."] = "Feitiços na lista negra nunca são exibidos."
 L["BoE"] = true
@@ -7704,7 +7706,7 @@ L["Everything here applies only while a controller is connected and WoW's gamepa
 L["Fade In/Out"] = "Surgir/Desaparecer"
 L["Fades the timer in at takeoff and out on landing."] = "Faz o cronômetro surgir gradualmente na decolagem e desaparecer no pouso."
 L["Fill Missing Health"] = "Preencher Vida Perdida"
-L["First and Last"] = "Primeiro e Último"
+L["Full Name"] = "Nome completo"
 L["First Name"] = "Primeiro Nome"
 L["Flip Dragon"] = "Inverter Dragão"
 L["For an ability that turns into another spell while active, enter the original spell's ID: its current form is checked."] = true

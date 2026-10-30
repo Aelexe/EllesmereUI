@@ -1189,7 +1189,8 @@ local function ApplyPreviewData(f, index, roles, classTokens)
         pv.hpPct, pv.hpPer = healthPct, 12000
         pv.ppPct, pv.ppPer = f._powerPct or 100, (pTok == "MANA") and 2500 or 1
         pv.ha = math.floor(healthPct * 3000)
-        pv.name = ns.CapName(ns.RF_FormatName and ns.RF_FormatName(name, s) or name, s)
+        -- rawName: for a custom text tag's own Name Format ([name:abbr]).
+        pv.rawName, pv.name = name, ns.CapName(ns.RF_FormatName(name, s), s)
         pv.dead, pv.offline = isDead or nil, isOffline or nil
         pv.power = not hidePower or nil
         pv.class, pv.pToken = classToken, pTok

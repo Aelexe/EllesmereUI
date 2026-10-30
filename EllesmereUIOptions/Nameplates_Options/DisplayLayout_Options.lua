@@ -1353,6 +1353,26 @@ local function BuildDisplayLayout(parent, y, ctx)
                 end
                 return dd
             end
+            -- The Name Format list: one control per row kind for every text slot,
+            -- built on first need. Its Character Count entry saves through the
+            -- per-show setter, as a pick does. Enemy names show here, so retail
+            -- warns that the game keeps them whole in restricted content.
+            local nameFormatDDs = {}
+            pf._NameFormatDD = function(kind)
+                local dd = nameFormatDDs[kind]
+                if not dd then
+                    local values, order, getValue, setValue = EllesmereUI.NameFormatMenu(listGet[kind], listSet[kind], {
+                        onSaved = function() nameFormatDDs[kind]._refreshLabel() end,
+                        enemies = true,
+                    })
+                    dd = EllesmereUI.BuildDropdownControl(pf, EllesmereUI.NAME_FORMAT_MENU_W, pf:GetFrameLevel() + 6,
+                        values, order, getValue, setValue)
+                    dd:SetScale(GROW_DD_SCALE)
+                    dd:Hide()
+                    nameFormatDDs[kind] = dd
+                end
+                return dd
+            end
 
             -- Optional toggle row, anchored at layout time: takes the 4th-row slot (G_ROW_Y) with no Grow row, stacks BELOW Grow when both present (e.g. Rare/Quest Indicator on topleft/topright: Grow + Show In Instances). Wired via pf._toggleGet/Set.
             local tLabel = MakeFont(pf, 12, nil, 1, 1, 1)
@@ -1870,11 +1890,13 @@ local function BuildDisplayLayout(parent, y, ctx)
             cogPopup._t3Toggle:Hide()
         end
 
-        -- Show/hide the second dropdown row ({ { value, label }, ... } like Grow)
+        -- Show/hide the second dropdown row ({ { value, label }, ... } like Grow,
+        -- or the Name Format list with dropdown2NameFormat)
         if hasDropdown2 then
             cogPopup._dd2Get = opts.dropdown2Get
             cogPopup._dd2Set = opts.dropdown2Set
-            local d2DD = cogPopup._ListDD("dd2", opts.dropdown2Values or {})
+            local d2DD = opts.dropdown2NameFormat and cogPopup._NameFormatDD("dd2")
+                or cogPopup._ListDD("dd2", opts.dropdown2Values or {})
             if cogPopup._d2DD and cogPopup._d2DD ~= d2DD then cogPopup._d2DD:Hide() end
             cogPopup._d2DD = d2DD
             d2DD._refreshLabel()
@@ -2922,14 +2944,11 @@ local function BuildDisplayLayout(parent, y, ctx)
             -- name, or a custom template that reads one. Full name is stored as
             -- nil (the runtime's unchanged path).
             local parsed = slotEl == "custom" and ns.NP_CustomParse(slotKey, DB())
-            if EllesmereUI.NAME_FORMAT_ORDER and (ns.IsNameElement(slotEl) or slotEl == "targetOfTarget"
-                or (parsed and (parsed.has.name or parsed.has.target))) then
+            if ns.IsNameElement(slotEl) or slotEl == "targetOfTarget"
+                or (parsed and (parsed.has.name or parsed.has.target)) then
                 local nfKey = slotKey .. "NameFormat"
                 cogOpts.dropdown2Label = "Name Format"
-                cogOpts.dropdown2Values = {}
-                for _, k in ipairs(EllesmereUI.NAME_FORMAT_ORDER) do
-                    cogOpts.dropdown2Values[#cogOpts.dropdown2Values + 1] = { value = k, label = EllesmereUI.NAME_FORMAT_VALUES[k] }
-                end
+                cogOpts.dropdown2NameFormat = true
                 cogOpts.dropdown2Get = function() return DBVal(nfKey) or "full" end
                 cogOpts.dropdown2Set = function(v)
                     DB()[nfKey] = (v ~= "full") and v or nil
