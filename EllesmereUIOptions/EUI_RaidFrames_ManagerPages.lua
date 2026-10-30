@@ -2628,10 +2628,10 @@ function ns.DMP_BuildPage(pageName, parent, yOffset)
         eyeBtn:SetFrameLevel(leftFixed:GetFrameLevel() + 5)
 
         local eyeTex = eyeBtn:CreateTexture(nil, "OVERLAY")
-        EllesmereUI.AccentEye(eyeBtn, eyeTex)
+        EllesmereUI.AccentGlyph(eyeBtn, eyeTex)
         eyeTex:SetAllPoints()
         eyeTex:SetTexture(ns._dmAllVisible and EYE_INVIS or EYE_VIS)
-        EllesmereUI.SetEyeAlpha(eyeBtn, 0.4)
+        EllesmereUI.SetGlyphAlpha(eyeBtn, 0.4)
 
         eyeBtn:SetScript("OnClick", function()
             ns._dmAllVisible = not ns._dmAllVisible
@@ -2639,11 +2639,11 @@ function ns.DMP_BuildPage(pageName, parent, yOffset)
             if ns.DMP_RefreshPreview then ns.DMP_RefreshPreview() end
         end)
         eyeBtn:SetScript("OnEnter", function(self)
-            EllesmereUI.SetEyeAlpha(self, 0.7)
+            EllesmereUI.SetGlyphAlpha(self, 0.7)
             EllesmereUI.ShowWidgetTooltip(self, "Toggle All Indicators")
         end)
         eyeBtn:SetScript("OnLeave", function(self)
-            EllesmereUI.SetEyeAlpha(self, 0.4)
+            EllesmereUI.SetGlyphAlpha(self, 0.4)
             EllesmereUI.HideWidgetTooltip()
         end)
     end

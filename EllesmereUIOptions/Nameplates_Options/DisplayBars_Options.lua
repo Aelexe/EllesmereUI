@@ -983,9 +983,9 @@ local function BuildDisplayBars(parent, y, ctx)
         eyeBtn:SetSize(26, 26)
         eyeBtn:SetPoint("RIGHT", leftRgn._lastInline or leftRgn._control, "LEFT", -8, 0)
         eyeBtn:SetFrameLevel(leftRgn:GetFrameLevel() + 5)
-        EllesmereUI.SetEyeAlpha(eyeBtn, 0.4)
+        EllesmereUI.SetGlyphAlpha(eyeBtn, 0.4)
         local eyeTex = eyeBtn:CreateTexture(nil, "OVERLAY")
-        EllesmereUI.AccentEye(eyeBtn, eyeTex)
+        EllesmereUI.AccentGlyph(eyeBtn, eyeTex)
         eyeTex:SetAllPoints()
         local function RefreshTargetGlowEye()
             if optState.showTargetGlowPreview then
@@ -1000,8 +1000,8 @@ local function BuildDisplayBars(parent, y, ctx)
             RefreshTargetGlowEye()
             UpdatePreview()
         end)
-        eyeBtn:SetScript("OnEnter", function(self) EllesmereUI.SetEyeAlpha(self, 0.7) end)
-        eyeBtn:SetScript("OnLeave", function(self) EllesmereUI.SetEyeAlpha(self, 0.4) end)
+        eyeBtn:SetScript("OnEnter", function(self) EllesmereUI.SetGlyphAlpha(self, 0.7) end)
+        eyeBtn:SetScript("OnLeave", function(self) EllesmereUI.SetGlyphAlpha(self, 0.4) end)
     end
 
     -- Enable Target Color ---- Target Texture

@@ -1276,9 +1276,9 @@ initFrame:SetScript("OnEvent", function(self)
             eyeBtn:SetPoint("RIGHT", leftRgn._lastInline or leftRgn._control, "LEFT", -8, 0)
             leftRgn._lastInline = eyeBtn
             eyeBtn:SetFrameLevel(leftRgn:GetFrameLevel() + 5)
-            EllesmereUI.SetEyeAlpha(eyeBtn, durOff() and 0.15 or 0.4)
+            EllesmereUI.SetGlyphAlpha(eyeBtn, durOff() and 0.15 or 0.4)
             local eyeTex = eyeBtn:CreateTexture(nil, "OVERLAY")
-            EllesmereUI.AccentEye(eyeBtn, eyeTex)
+            EllesmereUI.AccentGlyph(eyeBtn, eyeTex)
             eyeTex:SetAllPoints()
             local function RefreshDurEye()
                 if durPreviewShown then
@@ -1289,12 +1289,12 @@ initFrame:SetScript("OnEvent", function(self)
             end
             RefreshDurEye()
             eyeBtn:SetScript("OnEnter", function(self)
-                EllesmereUI.SetEyeAlpha(self, 0.7)
+                EllesmereUI.SetGlyphAlpha(self, 0.7)
                 EllesmereUI.ShowWidgetTooltip(self, "Preview durability warning")
             end)
             eyeBtn:SetScript("OnLeave", function(self)
                 EllesmereUI.HideWidgetTooltip()
-                EllesmereUI.SetEyeAlpha(self, 0.4)
+                EllesmereUI.SetGlyphAlpha(self, 0.4)
             end)
             eyeBtn:SetScript("OnClick", function(self)
                 durPreviewShown = not durPreviewShown
@@ -1326,15 +1326,15 @@ initFrame:SetScript("OnEvent", function(self)
                 if off then
                     durPreviewShown = false
                     RefreshDurEye()
-                    EllesmereUI.SetEyeAlpha(eyeBtn, 0.15)
+                    EllesmereUI.SetGlyphAlpha(eyeBtn, 0.15)
                     eyeBlock:Show()
                 else
-                    EllesmereUI.SetEyeAlpha(eyeBtn, 0.4)
+                    EllesmereUI.SetGlyphAlpha(eyeBtn, 0.4)
                     eyeBlock:Hide()
                 end
             end)
             local eyeInitOff = durOff()
-            EllesmereUI.SetEyeAlpha(eyeBtn, eyeInitOff and 0.15 or 0.4)
+            EllesmereUI.SetGlyphAlpha(eyeBtn, eyeInitOff and 0.15 or 0.4)
             if eyeInitOff then eyeBlock:Show() else eyeBlock:Hide() end
         end
 
