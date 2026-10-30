@@ -82,6 +82,12 @@ local function HistorySize()
     return n
 end
 
+-- The data bar's M+ Summary block sets this to repaint itself.
+local function NotifyRunsChanged()
+    local fn = EllesmereUI.OnMythicRunsChanged
+    if fn then fn() end
+end
+
 local function StoreRun(record)
     if type(record) ~= "table" then return end
     local sv = GetSV()
@@ -90,17 +96,27 @@ local function StoreRun(record)
     for i = #sv.runs, cap + 1, -1 do
         sv.runs[i] = nil
     end
+    NotifyRunsChanged()
 end
 
 function ns.RS_GetRuns()
     return GetSV().runs
 end
 
+-- Stored runs, newest first, or nil. Read only: never creates the SavedVariable.
+function EllesmereUI.GetMythicRuns()
+    local sv = _G[SV_NAME]
+    local runs = type(sv) == "table" and sv.runs
+    return type(runs) == "table" and runs or nil
+end
+
 function ns.RS_ClearHistory()
     local sv = GetSV()
     wipe(sv.runs)
     if RefreshWindowIfOpen then RefreshWindowIfOpen() end
+    NotifyRunsChanged()
 end
+EllesmereUI.ClearMythicRuns = ns.RS_ClearHistory
 
 -- Season purge: drop records for dungeons that are no longer in the pool, the
 -- same shape EMT:OnInitialize already uses for bestObjectiveSplits.

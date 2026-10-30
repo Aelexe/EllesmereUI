@@ -230,6 +230,7 @@ ns.BLOCK_TYPES = {
     { key = "crests",     label = "Crests" },
     { key = "ilvl",       label = "Item Level" },
     { key = "greatvault", label = "Great Vault" },
+    { key = "mplussummary", label = "M+ Summary" },
     { key = "audio",      label = "Audio" },
     { key = "ldb",        label = "Broker Plugin" },
     { key = "spacer",     label = "Spacer" },
@@ -264,6 +265,7 @@ ns.BLOCK_DEFAULTS = {
                    hideEmpty = false, reverse = false },
     ilvl       = { prefix = "short", value = "equipped", precision = 0 },
     greatvault = {},
+    mplussummary = { hideWhenEmpty = false },
     audio      = { channel = "master" },
     -- Broker plugin: one block type for every LibDataBroker data source, picked
     -- by name (source). stripColors defaults ON -- broker text arrives full of
@@ -277,13 +279,13 @@ ns.BLOCK_DEFAULTS = {
 -- Factories are registered by Blocks\*.lua.
 ns.BlockFactories = {}
 
--- WoW Forever has no Great Vault, no season crests and one spec per class with
--- nothing to switch: those blocks leave the picker (BLOCK_TYPES), the add path
--- refuses them (no default, so the Bottom Info Bar template skips its spec
--- block) and their Blocks\*.lua files return before registering a factory, so
+-- WoW Forever has no Great Vault, no season crests, no Mythic+ Tools runs and
+-- one spec per class with nothing to switch: those blocks leave the picker
+-- (BLOCK_TYPES), the add path refuses them (no default, so the Bottom Info Bar
+-- template skips its spec block) and their Blocks\*.lua files return before registering a factory, so
 -- a bar saved with one shows an empty slot there instead of erroring.
 if EllesmereUI.IS_FOREVER then
-    local FOREVER_OFF = { greatvault = true, crests = true, spec = true }
+    local FOREVER_OFF = { greatvault = true, crests = true, spec = true, mplussummary = true }
     table.insert(ns.BLOCK_TYPES, #ns.BLOCK_TYPES, { key = "supplies", label = "Class Resources" })
     ns.BLOCK_DEFAULTS.supplies = { showIcon = true }
     for i = #ns.BLOCK_TYPES, 1, -1 do

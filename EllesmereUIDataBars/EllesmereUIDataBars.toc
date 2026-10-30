@@ -27,6 +27,7 @@ Blocks\Supplies.lua
 Blocks\Crests.lua
 Blocks\ItemLevel.lua
 Blocks\GreatVault.lua
+Blocks\MythicSummary.lua
 Blocks\Audio.lua
 Blocks\LDB.lua
 Blocks\Spacer.lua
