@@ -1885,8 +1885,40 @@ initFrame:SetScript("OnEvent", function(self)
             EllesmereUI.RegisterWidgetRefresh(refresh)
         end
 
-        -- Row 6: Transparent World Map Sidebars (left) |. Not offered on WoW Forever:
-        -- Forever Essentials has its own map background option there.
+        -- Auto-Accept Resurrection: right of Row 6, or its own row on WoW Forever.
+        local resCfg = { type="toggle", text="Auto-Accept Resurrection",
+            tooltip="Automatically accepts resurrections from players who are out of combat, such as raid resses after a wipe. Use the cog to also accept combat resurrections.",
+            getValue=function()
+                return EllesmereUIDB and EllesmereUIDB.autoAcceptRes or false
+            end,
+            setValue=function(v)
+                if not EllesmereUIDB then EllesmereUIDB = {} end
+                EllesmereUIDB.autoAcceptRes = v
+                if EllesmereUI._applyAutoAcceptRes then EllesmereUI._applyAutoAcceptRes() end
+                EllesmereUI:RefreshPage()
+            end }
+        local function BuildResCog(rgn)
+            if EllesmereUI._prebuilding then return end
+            EllesmereUI.BuildInlineCog(rgn, {
+                title = "Auto-Accept Resurrection",
+                rows = {
+                    { type="toggle", label="Accept Combat Resurrections",
+                      get=function()
+                          return EllesmereUIDB and EllesmereUIDB.autoAcceptResCombat or false
+                      end,
+                      set=function(v)
+                          if not EllesmereUIDB then EllesmereUIDB = {} end
+                          EllesmereUIDB.autoAcceptResCombat = v
+                      end },
+                },
+                gap = 9,
+                disabled = function() return not (EllesmereUIDB and EllesmereUIDB.autoAcceptRes) end,
+                disabledTooltip = "Auto-Accept Resurrection",
+            })
+        end
+
+        -- Row 6: Transparent World Map Sidebars (left) | Auto-Accept Resurrection. Not offered
+        -- on WoW Forever: Forever Essentials has its own map background option there.
         if not EllesmereUI.IS_FOREVER then
             local sidebarsRow
             sidebarsRow, h = W:DualRow(parent, y,
@@ -1901,8 +1933,9 @@ initFrame:SetScript("OnEvent", function(self)
                       if EllesmereUI._applyMapSidebars then EllesmereUI._applyMapSidebars() end
                       EllesmereUI:RefreshPage()
                   end },
-                EllesmereUI.BlankRowCfg()
+                resCfg
             );  y = y - h
+            BuildResCog(sidebarsRow._rightRegion)
             -- Cog on Transparent World Map Sidebars (left region)
             if not EllesmereUI._prebuilding then
                 local function sidebarsOff()
@@ -1924,6 +1957,10 @@ initFrame:SetScript("OnEvent", function(self)
                     gap = 9, disabled = sidebarsOff, disabledTooltip = "Transparent World Map Sidebars",
                 })
             end
+        else
+            local resRow
+            resRow, h = W:DualRow(parent, y, resCfg, EllesmereUI.BlankRowCfg());  y = y - h
+            BuildResCog(resRow._leftRegion)
         end
 
         _, h = W:Spacer(parent, y, 20);  y = y - h
