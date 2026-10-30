@@ -139,8 +139,9 @@ local function BuildInlineCog(rgn, opts)
         if block then block:SetShown(off and true or false) end
     end
     btn._euiCogState = State
+    -- Repaints on accent changes (opts.paint reads the accent too: the unlock jump).
     -- Keyed by the texture: the page pool forgets the entry when it resets it.
-    if accentIcon then EllesmereUI.RegAccent({ type = "callback", obj = tex, fn = function() State() end }) end
+    if accentIcon or opts.paint then EllesmereUI.RegAccent({ type = "callback", obj = tex, fn = function() State() end }) end
 
     btn:SetScript("OnEnter", function(self)
         State(true)
