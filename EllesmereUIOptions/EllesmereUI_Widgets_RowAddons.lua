@@ -131,6 +131,31 @@ local function BuildInlineCog(rgn, opts)
     return btn, show
 end
 
+-- Eye preview toggles (EYE_VISIBLE_ICON / EYE_INVISIBLE_ICON): each page builds
+-- its own, so it marks the glyph with AccentEye(btn, tex) once and sets the
+-- button's alpha through SetEyeAlpha(btn, a) with its old values (0.15
+-- disabled, 0.4 idle, 0.7 hovered). Like the accent cogs: the accent, 0.15
+-- brighter, white while disabled, following accent changes.
+local function PaintEye(btn)
+    local a, tex = btn._eyeA or 0.4, btn._eyeTex
+    local off = a <= 0.15
+    btn:SetAlpha(off and a or math.min(1, a + 0.15))
+    if not tex then return end
+    if off then tex:SetVertexColor(1, 1, 1) else tex:SetVertexColor(EllesmereUI.GetAccentColor()) end
+end
+
+function EllesmereUI.SetEyeAlpha(btn, a)
+    btn._eyeA = a
+    PaintEye(btn)
+end
+
+function EllesmereUI.AccentEye(btn, tex)
+    btn._eyeTex = tex
+    PaintEye(btn)
+    -- Keyed by the texture: the page pool forgets the entry when it resets it.
+    EllesmereUI.RegAccent({ type = "callback", obj = tex, fn = function() PaintEye(btn) end })
+end
+
 -- Inline text button on a DualRow half-region, left of its last inline item or
 -- control (or at the half's right edge when it has neither, e.g. a label half).
 -- opts: width (110), height (24), gap (8), chain (default true: becomes

@@ -1276,8 +1276,9 @@ initFrame:SetScript("OnEvent", function(self)
             eyeBtn:SetPoint("RIGHT", leftRgn._lastInline or leftRgn._control, "LEFT", -8, 0)
             leftRgn._lastInline = eyeBtn
             eyeBtn:SetFrameLevel(leftRgn:GetFrameLevel() + 5)
-            eyeBtn:SetAlpha(durOff() and 0.15 or 0.4)
+            EllesmereUI.SetEyeAlpha(eyeBtn, durOff() and 0.15 or 0.4)
             local eyeTex = eyeBtn:CreateTexture(nil, "OVERLAY")
+            EllesmereUI.AccentEye(eyeBtn, eyeTex)
             eyeTex:SetAllPoints()
             local function RefreshDurEye()
                 if durPreviewShown then
@@ -1288,12 +1289,12 @@ initFrame:SetScript("OnEvent", function(self)
             end
             RefreshDurEye()
             eyeBtn:SetScript("OnEnter", function(self)
-                self:SetAlpha(0.7)
+                EllesmereUI.SetEyeAlpha(self, 0.7)
                 EllesmereUI.ShowWidgetTooltip(self, "Preview durability warning")
             end)
             eyeBtn:SetScript("OnLeave", function(self)
                 EllesmereUI.HideWidgetTooltip()
-                self:SetAlpha(0.4)
+                EllesmereUI.SetEyeAlpha(self, 0.4)
             end)
             eyeBtn:SetScript("OnClick", function(self)
                 durPreviewShown = not durPreviewShown
@@ -1325,15 +1326,15 @@ initFrame:SetScript("OnEvent", function(self)
                 if off then
                     durPreviewShown = false
                     RefreshDurEye()
-                    eyeBtn:SetAlpha(0.15)
+                    EllesmereUI.SetEyeAlpha(eyeBtn, 0.15)
                     eyeBlock:Show()
                 else
-                    eyeBtn:SetAlpha(0.4)
+                    EllesmereUI.SetEyeAlpha(eyeBtn, 0.4)
                     eyeBlock:Hide()
                 end
             end)
             local eyeInitOff = durOff()
-            eyeBtn:SetAlpha(eyeInitOff and 0.15 or 0.4)
+            EllesmereUI.SetEyeAlpha(eyeBtn, eyeInitOff and 0.15 or 0.4)
             if eyeInitOff then eyeBlock:Show() else eyeBlock:Hide() end
         end
 
