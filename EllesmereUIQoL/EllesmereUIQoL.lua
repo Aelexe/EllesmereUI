@@ -2168,7 +2168,6 @@ end
 -------------------------------------------------------------------------------
 do
     local issecret = issecretvalue or function() return false end
-    local POPUPS = { "RESURRECT", "RESURRECT_NO_SICKNESS", "RESURRECT_NO_TIMER" }
     local frame
 
     -- A secret or unreadable answer counts as in combat.
@@ -2179,13 +2178,9 @@ do
         return v and true or false
     end
 
-    local function OnEvent(_, event, caster)
-        if event == "RESURRECT_REQUEST" then
-            if not EllesmereUIDB.autoAcceptResCombat and CasterInCombat(caster) then return end
-            AcceptResurrect()
-        elseif not UnitIsDeadOrGhost("player") and StaticPopup_Hide then
-            for i = 1, #POPUPS do StaticPopup_Hide(POPUPS[i]) end
-        end
+    local function OnEvent(_, _, caster)
+        if not EllesmereUIDB.autoAcceptResCombat and CasterInCombat(caster) then return end
+        AcceptResurrect()
     end
 
     local function ApplyAutoAcceptRes()
@@ -2197,10 +2192,8 @@ do
         if not frame then return end
         if on then
             frame:RegisterEvent("RESURRECT_REQUEST")
-            frame:RegisterEvent("PLAYER_ALIVE")
-            frame:RegisterEvent("PLAYER_UNGHOST")
         else
-            frame:UnregisterAllEvents()
+            frame:UnregisterEvent("RESURRECT_REQUEST")
         end
     end
     EllesmereUI._applyAutoAcceptRes = ApplyAutoAcceptRes
