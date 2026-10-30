@@ -3495,6 +3495,8 @@ initFrame:SetScript("OnEvent", function(self)
                 prefixFs:SetPoint("RIGHT", nameFs, "LEFT", -4, 0)
                 prefixFs:SetText(EllesmereUI.L("Special thanks to:"))
                 thanksBtn._nameFs, thanksBtn._prefixFs = nameFs, prefixFs
+                EllesmereUI.RegAccent({ type = "callback", obj = nameFs,
+                    fn = function(r, g, b) nameFs:SetTextColor(r, g, b, 0.9) end })
                 thanksBtn:SetScript("OnEnter", function(self)
                     self._prefixFs:SetAlpha(0.75)
                     self._nameFs:SetAlpha(1)

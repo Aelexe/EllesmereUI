@@ -2567,9 +2567,9 @@ local function BuildDisplayLayout(parent, y, ctx)
             local lfp = (EllesmereUI.GetFontPath("nameplates")) or DBVal("font")
             local lfs = link:CreateFontString(nil, "OVERLAY")
             lfs:SetFont(lfp, 12, "")
-            local ar, ag, ab = 1, 0.82, 0.30
-            if EllesmereUI.GetAccentColor then ar, ag, ab = EllesmereUI.GetAccentColor() end
-            lfs:SetTextColor(ar, ag, ab)
+            lfs:SetTextColor(EllesmereUI.GetAccentColor())
+            -- Keyed by the font string: the page pool forgets the entry when it resets it.
+            EllesmereUI.RegAccent({ type = "callback", obj = lfs, fn = function(r, g, b) lfs:SetTextColor(r, g, b) end })
             lfs:SetAlpha(0.85)
             lfs:SetPoint("CENTER")
             lfs:SetText(EllesmereUI.L("Edit Tracked Auras"))
