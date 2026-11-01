@@ -327,7 +327,7 @@ local function BuildLivePreview(parent, yOff)
         if useClassColor == nil then useClassColor = settings.shapeBorderClassColor end
         if useClassColor then
             local _, ct = UnitClass("player")
-            if ct then local cc = RAID_CLASS_COLORS[ct]; if cc then shapeBrdR, shapeBrdG, shapeBrdB = cc.r, cc.g, cc.b end end
+            if ct then local cc = EllesmereUI.GetClassColor(ct); if cc then shapeBrdR, shapeBrdG, shapeBrdB = cc.r, cc.g, cc.b end end
         end
 
         local scaledBtnW = SnapS(btnW * (self._blizzEditScale or 1))
@@ -556,7 +556,7 @@ local function BuildLivePreview(parent, yOff)
                     local cr, cg, cb, ca = brdColor.r, brdColor.g, brdColor.b, brdColor.a
                     if useClassColor then
                         local _, ct2 = UnitClass("player")
-                        if ct2 then local cc2 = RAID_CLASS_COLORS[ct2]; if cc2 then cr, cg, cb = cc2.r, cc2.g, cc2.b end end
+                        if ct2 then local cc2 = EllesmereUI.GetClassColor(ct2); if cc2 then cr, cg, cb = cc2.r, cc2.g, cc2.b end end
                     end
                     -- The pixels the live strips draw (SnapBorderTextures): the exact size
                     -- when set, else the step, as whole pixels at this button's scale.
@@ -661,7 +661,7 @@ local function BuildLivePreview(parent, yOff)
                         local cr, cg, cb, ca = brdColor.r, brdColor.g, brdColor.b, brdColor.a or 1
                         if useClassColor then
                             local _, ct2 = UnitClass("player")
-                            if ct2 then local cc2 = RAID_CLASS_COLORS[ct2]; if cc2 then cr, cg, cb = cc2.r, cc2.g, cc2.b end end
+                            if ct2 then local cc2 = EllesmereUI.GetClassColor(ct2); if cc2 then cr, cg, cb = cc2.r, cc2.g, cc2.b end end
                         end
                         bdPv:SetBackdropBorderColor(cr, cg, cb, ca)
                         bdPv:Show()

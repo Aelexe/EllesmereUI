@@ -906,7 +906,7 @@ local function BuildBarAppearance(parent, y, ctx)
             rightRgn, abBsRow:GetFrameLevel() + 3,
             function()
                 local _, ct = UnitClass("player")
-                local cc = ct and RAID_CLASS_COLORS and RAID_CLASS_COLORS[ct]
+                local cc = ct and EllesmereUI.GetClassColor(ct)
                 if cc then return cc.r, cc.g, cc.b end
                 return 1, 1, 1
             end,

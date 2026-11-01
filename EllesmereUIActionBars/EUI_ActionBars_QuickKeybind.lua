@@ -540,7 +540,7 @@ _quickKeybindState.InitButtons = function()
                                     local cr, cg, cb, ca = c.r, c.g, c.b, c.a or 1
                                     if s.borderClassColor then
                                         local _, ct = UnitClass("player")
-                                        local cc = ct and RAID_CLASS_COLORS[ct]
+                                        local cc = ct and EllesmereUI.GetClassColor(ct)
                                         if cc then cr, cg, cb = cc.r, cc.g, cc.b end
                                     end
                                     local sz, px = ResolveBorderThickness(s)

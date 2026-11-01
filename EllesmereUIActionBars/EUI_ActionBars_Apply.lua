@@ -51,7 +51,7 @@ function EAB:ApplyBordersForBar(barKey)
     if s.borderClassColor then
         local _, classToken = UnitClass("player")
         if classToken then
-            local cc = RAID_CLASS_COLORS[classToken]
+            local cc = EllesmereUI.GetClassColor(classToken)
             if cc then cr, cg, cb = cc.r, cc.g, cc.b end
         end
     end
@@ -99,7 +99,7 @@ function EAB:ApplyShapesForBar(barKey)
     local brdR, brdG, brdB, brdA = brdColor.r, brdColor.g, brdColor.b, brdColor.a or 1
     if s.borderClassColor then
         local _, ct = UnitClass("player")
-        if ct then local cc = RAID_CLASS_COLORS[ct]; if cc then brdR, brdG, brdB = cc.r, cc.g, cc.b end end
+        if ct then local cc = EllesmereUI.GetClassColor(ct); if cc then brdR, brdG, brdB = cc.r, cc.g, cc.b end end
     end
     local buttons = barButtons[barKey]
     if not buttons then return end

@@ -177,7 +177,7 @@ local function OnBlizzardFlyoutShow(flyout)
     if s.borderClassColor then
         local _, ct = UnitClass("player")
         if ct then
-            local cc = RAID_CLASS_COLORS[ct]
+            local cc = EllesmereUI.GetClassColor(ct)
             if cc then cr, cg, cb = cc.r, cc.g, cc.b end
         end
     end
@@ -186,7 +186,7 @@ local function OnBlizzardFlyoutShow(flyout)
     if s.borderClassColor then
         local _, ct = UnitClass("player")
         if ct then
-            local cc = RAID_CLASS_COLORS[ct]
+            local cc = EllesmereUI.GetClassColor(ct)
             if cc then sbR, sbG, sbB = cc.r, cc.g, cc.b end
         end
     end
