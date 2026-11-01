@@ -2870,7 +2870,7 @@ if not EllesmereUI.ResolveActiveAccent then
         local acc = p and p.euiAccent
         -- 1) per-profile euiAccent
         if acc and acc.useClass then
-            local c = CLASS_COLOR_MAP[playerClass]
+            local c = EllesmereUI.GetClassColorUndarkened(playerClass)
             if c then return c.r, c.g, c.b end
         end
         if acc and acc.custom then
@@ -2879,7 +2879,7 @@ if not EllesmereUI.ResolveActiveAccent then
         end
         -- 2) frozen global root (only when no explicit per-profile euiAccent)
         if (not acc) and db and db.useClassAccentColor then
-            local c = CLASS_COLOR_MAP[playerClass]
+            local c = EllesmereUI.GetClassColorUndarkened(playerClass)
             if c then return c.r, c.g, c.b end
         end
         local gca = db and db.customAccentColor

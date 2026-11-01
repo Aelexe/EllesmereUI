@@ -68,8 +68,9 @@ local function ResolveColor(cfg)
         return EllesmereUI.GetAccentColor()
     end
     if cfg.useClassColor then
+        -- Not RAID_CLASS_COLORS: honours the Global Settings class palette, matching the accent.
         local _, engClass = UnitClass("player")
-        local cc = engClass and RAID_CLASS_COLORS and RAID_CLASS_COLORS[engClass]
+        local cc = engClass and EllesmereUI.GetClassColorUndarkened(engClass)
         if cc then return cc.r, cc.g, cc.b end
     end
     return ParseHex(cfg.hex or DEF_HEX)
@@ -1418,6 +1419,16 @@ function ECL:OnEnable()
         if p.gcd and p.gcd.useAccentColor then ApplyGCDCircle() end
         if p.castCircle and p.castCircle.useAccentColor then ApplyCastCircle() end
     end })
+
+    -- Repaint class-coloured parts on a class palette edit (ApplyColorsToOUF calls this).
+    -- The trail needs nothing: it resolves its colour per dot.
+    EllesmereUI._Cursor_RefreshColors = function()
+        local p = ECL.db and ECL.db.profile
+        if not p then return end
+        if p.useClassColor then Apply() end
+        if p.gcd and p.gcd.useClassColor then ApplyGCDCircle() end
+        if p.castCircle and p.castCircle.useClassColor then ApplyCastCircle() end
+    end
 
     -- Apply GCD / Cast circles (creates on demand only when enabled)
     C_Timer.After(0.5, function()

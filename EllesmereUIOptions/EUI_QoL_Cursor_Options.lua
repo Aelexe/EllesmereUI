@@ -166,7 +166,7 @@ initFrame:SetScript("OnEvent", function(self)
                   hasAlpha = false,
                   getValue = function()
                       local _, classFile = UnitClass("player")
-                      local cc = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
+                      local cc = classFile and EllesmereUI.GetClassColorUndarkened(classFile)
                       if cc then return cc.r, cc.g, cc.b end
                       return 12/255, 210/255, 157/255
                   end,
@@ -365,7 +365,7 @@ initFrame:SetScript("OnEvent", function(self)
                   hasAlpha = false,
                   getValue = function()
                       local _, classFile = UnitClass("player")
-                      local cc = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
+                      local cc = classFile and EllesmereUI.GetClassColorUndarkened(classFile)
                       if cc then return cc.r, cc.g, cc.b end
                       return 12/255, 210/255, 157/255
                   end,
@@ -528,7 +528,7 @@ initFrame:SetScript("OnEvent", function(self)
                   hasAlpha = false,
                   getValue = function()
                       local _, classFile = UnitClass("player")
-                      local cc = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
+                      local cc = classFile and EllesmereUI.GetClassColorUndarkened(classFile)
                       if cc then return cc.r, cc.g, cc.b end
                       return 12/255, 210/255, 157/255
                   end,
